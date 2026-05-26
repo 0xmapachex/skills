@@ -123,8 +123,8 @@ nav.rail {
 }
 .rail__brand b { color: var(--ink); font-weight: 500; }
 .rail__title {
-  font-family: var(--serif); font-size: 21px; line-height: 1.25;
-  margin: 18px 0 30px; font-weight: 500;
+  font-family: var(--serif); font-size: 23px; line-height: 1.22;
+  margin: 18px 0 30px; font-weight: 600;
   font-variation-settings: 'SOFT' 30, 'WONK' 0;
 }
 .rail ol {
@@ -190,8 +190,8 @@ section.section:last-of-type { border-bottom: none; }
   padding: 2px 8px; border-radius: 3px; font-weight: 500;
 }
 .section h2 {
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(28px, 4.2vw, 42px);
+  font-family: var(--serif); font-weight: 600;
+  font-size: clamp(32px, 4.6vw, 48px);
   line-height: 1.08; letter-spacing: -.015em;
   font-variation-settings: 'SOFT' 40, 'WONK' 1;
   margin-bottom: 22px;
@@ -199,8 +199,8 @@ section.section:last-of-type { border-bottom: none; }
 }
 .section h2 em { font-style: italic; color: var(--accent); }
 .section h3 {
-  font-family: var(--serif); font-weight: 500;
-  font-size: 22px; line-height: 1.25;
+  font-family: var(--serif); font-weight: 600;
+  font-size: 24px; line-height: 1.25;
   margin: 0 0 6px;
   color: var(--ink);
 }
@@ -238,8 +238,8 @@ code {
   content: "●"; font-size: 7px; vertical-align: middle; margin-right: 7px;
 }
 .hero__title {
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(38px, 6vw, 70px);
+  font-family: var(--serif); font-weight: 600;
+  font-size: clamp(42px, 6.4vw, 76px);
   line-height: 1.04; letter-spacing: -.025em;
   font-variation-settings: 'SOFT' 30, 'WONK' 1;
   margin-bottom: 28px;
