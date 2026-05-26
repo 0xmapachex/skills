@@ -1,0 +1,111 @@
+{
+  "meta": {
+    "title": "feat(billing): add usage-based pricing tier",
+    "base": "main",
+    "head": "HEAD",
+    "files_changed": 23,
+    "additions": 612,
+    "deletions": 41,
+    "pr_type_tags": ["feature", "db-schema", "billing", "infra"]
+  },
+  "summary": {
+    "bullets": [
+      "Adds a new usage-based pricing tier with metered execution and monthly invoicing.",
+      "Two new tables: usage_meter_events, usage_invoices.",
+      "Cron job rolls up meter events into invoice line items nightly.",
+      "Touches: orchestrator, billing service, admin dashboard, infra cron config.",
+      "No production data backfill required — new tier opt-in only."
+    ]
+  },
+  "architecture": {
+    "nodes": [
+      { "id": "ui",         "label": "Admin Billing UI",  "kind": "ui",        "changed": true },
+      { "id": "api",        "label": "Billing API",        "kind": "service",   "changed": true },
+      { "id": "rollup-job", "label": "Nightly rollup",     "kind": "job",       "changed": true },
+      { "id": "db",         "label": "Postgres",           "kind": "datastore", "changed": true },
+      { "id": "stripe",     "label": "Stripe",             "kind": "external",  "changed": false }
+    ],
+    "edges": [
+      { "from": "ui",         "to": "api",    "label": "REST",           "kind": "sync" },
+      { "from": "api",        "to": "db",     "label": "writes",         "kind": "data" },
+      { "from": "rollup-job", "to": "db",     "label": "scan/write",     "kind": "data" },
+      { "from": "api",        "to": "stripe", "label": "create invoice", "kind": "async" }
+    ],
+    "details": {
+      "ui":         { "summary": "New tier selector + usage dashboard.", "files": ["apps/admin/src/app/billing/page.tsx"], "status": "changed" },
+      "api":        { "summary": "Adds /billing/usage endpoints and tier-switch logic.", "files": ["apps/api/src/billing/handlers.ts:1-220"], "status": "changed" },
+      "rollup-job": { "summary": "Cron-triggered job that rolls meter events into invoice line items.", "files": ["jobs/usage-rollup.ts"], "status": "added" },
+      "db":         { "summary": "New tables and one new index. See Database section.", "status": "changed" },
+      "stripe":     { "summary": "External; we POST invoices to it.", "status": "context" }
+    }
+  },
+  "flow": {
+    "actors": [
+      { "id": "user",  "label": "User",          "kind": "user" },
+      { "id": "ui",    "label": "Admin UI",      "kind": "service" },
+      { "id": "api",   "label": "Billing API",   "kind": "service" },
+      { "id": "db",    "label": "Postgres",      "kind": "datastore" },
+      { "id": "cron",  "label": "Nightly cron",  "kind": "service" }
+    ],
+    "steps": [
+      { "from": "user", "to": "ui",   "label": "Open billing page",         "changed": false },
+      { "from": "ui",   "to": "api",  "label": "GET /billing/usage",        "changed": true },
+      { "from": "api",  "to": "db",   "label": "SELECT usage_meter_events", "changed": true },
+      { "from": "cron", "to": "db",   "label": "Rollup -> usage_invoices",  "changed": true }
+    ]
+  },
+  "database": {
+    "tables": [
+      {
+        "id": "usage_meter_events", "name": "usage_meter_events", "status": "added",
+        "fields": [
+          { "name": "id",          "type": "uuid",        "status": "added", "nullable": false },
+          { "name": "tenant_id",   "type": "uuid",        "status": "added", "nullable": false },
+          { "name": "kind",        "type": "text",        "status": "added", "nullable": false },
+          { "name": "quantity",    "type": "numeric",     "status": "added", "nullable": false },
+          { "name": "occurred_at", "type": "timestamptz", "status": "added", "nullable": false }
+        ]
+      },
+      {
+        "id": "usage_invoices", "name": "usage_invoices", "status": "added",
+        "fields": [
+          { "name": "id",           "type": "uuid",  "status": "added", "nullable": false },
+          { "name": "tenant_id",    "type": "uuid",  "status": "added", "nullable": false },
+          { "name": "period_start", "type": "date",  "status": "added", "nullable": false },
+          { "name": "period_end",   "type": "date",  "status": "added", "nullable": false },
+          { "name": "stripe_id",    "type": "text",  "status": "added", "nullable": true, "privacy": true }
+        ]
+      },
+      {
+        "id": "tenants", "name": "tenants", "status": "context",
+        "fields": [
+          { "name": "id",   "type": "uuid", "status": "context", "nullable": false },
+          { "name": "tier", "type": "text", "status": "changed", "nullable": false }
+        ]
+      }
+    ],
+    "relations": [
+      { "from": "usage_meter_events.tenant_id", "to": "tenants.id", "status": "added" },
+      { "from": "usage_invoices.tenant_id",     "to": "tenants.id", "status": "added" }
+    ]
+  },
+  "code_observations": {
+    "items": [
+      { "title": "Quantity arithmetic uses Number, not Decimal", "kind": "risky-spot", "files": ["apps/api/src/billing/handlers.ts:88"], "note": "Consider revisiting before currency math becomes load-bearing." },
+      { "title": "Cron schedule string duplicated in two places", "kind": "pattern", "files": ["infra/cron.yaml:12", "jobs/usage-rollup.ts:4"] }
+    ]
+  },
+  "risk_rollout": {
+    "items": [
+      { "title": "Cron must deploy after migration",           "severity": "careful", "notes": "Rollup job references new tables; deploy order matters." },
+      { "title": "Stripe API write side effect",               "severity": "watch",   "notes": "Invoice creation is not idempotent in v1; relies on dedupe by (tenant, period_start)." },
+      { "title": "Privacy: stripe_id is treated as sensitive", "severity": "info",    "notes": "Not exported in admin CSV." }
+    ]
+  },
+  "open_questions": {
+    "items": [
+      "Tier switch mid-period — pro-rate or charge full period?",
+      "Should the rollup job be idempotent so re-runs don't duplicate invoices?"
+    ]
+  }
+}
