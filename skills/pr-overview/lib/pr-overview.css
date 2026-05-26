@@ -184,13 +184,58 @@ body {
 .field-row.is-removed { border-left-color: var(--removed); }
 .field-row.is-privacy { box-shadow: inset 3px 0 0 var(--privacy); }
 
-/* ===== Flow lanes ===== */
-.flow-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0; }
-.flow-lane { border-right: 1px dashed var(--border); padding: 8px; min-height: 360px; }
-.flow-lane:last-child { border-right: 0; }
-.flow-lane__header { font-size: 12px; color: var(--fg-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
-.flow-step { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin: 6px 0; cursor: pointer; font-size: 12px; }
-.flow-step.is-changed { border-color: var(--changed); }
+/* ===== Flow (UML sequence diagram) ===== */
+.flow-seq {
+  border: 1px solid var(--border); border-radius: 4px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0)
+    0 0 / 24px 24px var(--bg);
+  padding: 0; overflow-x: auto;
+}
+.flow-seq__actors {
+  position: relative; height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.flow-actor {
+  position: absolute; top: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border-hi); border-radius: 4px;
+  padding: 8px 12px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 12px;
+}
+.flow-actor__kind { font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.flow-actor__label { font-weight: 600; color: var(--fg); margin-top: 2px; }
+
+.flow-seq__stage { position: relative; }
+.flow-seq__lifelines, .flow-seq__messages {
+  position: absolute; top: 0; left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.flow-seq__messages { pointer-events: auto; }
+.flow-seq__messages rect { pointer-events: auto; }
+.flow-seq__lifeline {
+  stroke: var(--border); stroke-width: 1.5; stroke-dasharray: 4 6;
+}
+.flow-seq__msg {
+  stroke: var(--fg-muted); stroke-width: 1.6; fill: none;
+}
+.flow-seq__msg.is-changed { stroke: var(--changed); stroke-width: 2; }
+.flow-seq__label {
+  fill: var(--fg); font-size: 12px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  paint-order: stroke;
+  stroke: var(--bg); stroke-width: 4px;
+}
+.flow-seq__num {
+  fill: var(--fg-muted); font-size: 10px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  paint-order: stroke;
+  stroke: var(--bg); stroke-width: 3px;
+}
 
 /* ===== Prose cards (observations, risk, open questions) ===== */
 .prose-card {

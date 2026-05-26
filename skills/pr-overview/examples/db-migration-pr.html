@@ -190,13 +190,58 @@ body {
 .field-row.is-removed { border-left-color: var(--removed); }
 .field-row.is-privacy { box-shadow: inset 3px 0 0 var(--privacy); }
 
-/* ===== Flow lanes ===== */
-.flow-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0; }
-.flow-lane { border-right: 1px dashed var(--border); padding: 8px; min-height: 360px; }
-.flow-lane:last-child { border-right: 0; }
-.flow-lane__header { font-size: 12px; color: var(--fg-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
-.flow-step { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin: 6px 0; cursor: pointer; font-size: 12px; }
-.flow-step.is-changed { border-color: var(--changed); }
+/* ===== Flow (UML sequence diagram) ===== */
+.flow-seq {
+  border: 1px solid var(--border); border-radius: 4px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0)
+    0 0 / 24px 24px var(--bg);
+  padding: 0; overflow-x: auto;
+}
+.flow-seq__actors {
+  position: relative; height: 56px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-elev);
+}
+.flow-actor {
+  position: absolute; top: 8px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border-hi); border-radius: 4px;
+  padding: 8px 12px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 12px;
+}
+.flow-actor__kind { font-size: 10px; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.flow-actor__label { font-weight: 600; color: var(--fg); margin-top: 2px; }
+
+.flow-seq__stage { position: relative; }
+.flow-seq__lifelines, .flow-seq__messages {
+  position: absolute; top: 0; left: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+.flow-seq__messages { pointer-events: auto; }
+.flow-seq__messages rect { pointer-events: auto; }
+.flow-seq__lifeline {
+  stroke: var(--border); stroke-width: 1.5; stroke-dasharray: 4 6;
+}
+.flow-seq__msg {
+  stroke: var(--fg-muted); stroke-width: 1.6; fill: none;
+}
+.flow-seq__msg.is-changed { stroke: var(--changed); stroke-width: 2; }
+.flow-seq__label {
+  fill: var(--fg); font-size: 12px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  paint-order: stroke;
+  stroke: var(--bg); stroke-width: 4px;
+}
+.flow-seq__num {
+  fill: var(--fg-muted); font-size: 10px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  paint-order: stroke;
+  stroke: var(--bg); stroke-width: 3px;
+}
 
 /* ===== Prose cards (observations, risk, open questions) ===== */
 .prose-card {
@@ -501,33 +546,178 @@ body {
       `;
     }
   }
+  // Real UML sequence diagram: actors at top, dashed vertical lifelines,
+  // horizontal message arrows stacked top-to-bottom (time flows down).
   function renderFlow(host, f) {
-    const wrap = el('div', { class: 'flow-lanes' });
+    const actorCount = f.actors.length;
+    if (actorCount === 0) {
+      host.appendChild(el('p', { class: 'prose-card__body' }, 'No flow steps to render.'));
+      return;
+    }
 
-    const stepsByActor = new Map(f.actors.map((a) => [a.id, []]));
-    f.steps.forEach((s) => {
-      // Pin the step to its "from" actor's lane; reader can follow the arrow text to "to".
-      if (stepsByActor.has(s.from)) stepsByActor.get(s.from).push(s);
-    });
+    // Layout constants.
+    const headerH       = 56;   // actor header card height
+    const headerGapY    = 36;   // gap below header before first message
+    const stepGapY      = 56;   // vertical spacing between messages
+    const padding       = 32;
+    const minActorW     = 140;
+    const actorGapX     = 40;
 
-    f.actors.forEach((a) => {
-      const lane = el('div', { class: 'flow-lane' }, [
-        el('div', { class: 'flow-lane__header' }, a.label),
+    // Build actor headers offscreen first so we can measure their widths.
+    const actorEls = f.actors.map((a) => {
+      const card = el('div', { class: 'flow-actor', 'data-actor': a.id }, [
+        el('span', { class: 'flow-actor__kind' }, a.kind || ''),
+        el('span', { class: 'flow-actor__label' }, a.label),
       ]);
-      (stepsByActor.get(a.id) || []).forEach((s) => {
-        const target = f.actors.find((x) => x.id === s.to)?.label || s.to;
-        const step = el('div', {
-          class: 'flow-step' + (s.changed ? ' is-changed' : ''),
-        }, `${s.label} → ${target}`);
-        step.addEventListener('click', () => {
-          openDetail(`<h3>${escapeHTML(s.label)}</h3><p><code>${escapeHTML(s.from)}</code> → <code>${escapeHTML(s.to)}</code></p>`);
-        });
-        lane.appendChild(step);
-      });
-      wrap.appendChild(lane);
+      return { actor: a, card };
     });
 
+    // Mount the diagram chrome.
+    const wrap     = el('div', { class: 'flow-seq' });
+    const headerRow= el('div', { class: 'flow-seq__actors' });
+    const stage    = el('div', { class: 'flow-seq__stage' });
+    const lifeSvg  = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const msgSvg   = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    lifeSvg.setAttribute('class', 'flow-seq__lifelines');
+    msgSvg.setAttribute('class',  'flow-seq__messages');
+    stage.appendChild(lifeSvg);
+    stage.appendChild(msgSvg);
+    wrap.appendChild(headerRow);
+    wrap.appendChild(stage);
+    actorEls.forEach(({ card }) => headerRow.appendChild(card));
     host.appendChild(wrap);
+
+    // Measure actor card widths after the DOM has them.
+    requestAnimationFrame(() => {
+      const actorW = actorEls.map(({ card }) => Math.max(minActorW, card.offsetWidth));
+
+      // Distribute actors evenly across the available width if there's room,
+      // otherwise stack them at their natural widths plus actorGapX.
+      const totalNatural = actorW.reduce((a, b) => a + b, 0) + actorGapX * (actorCount - 1);
+      const availW = Math.max(stage.clientWidth - padding * 2, totalNatural);
+      const extra  = Math.max(0, availW - totalNatural);
+      const perGap = actorCount > 1 ? extra / (actorCount - 1) : 0;
+
+      const actorX = [];
+      let cursor = padding;
+      actorEls.forEach(({ card }, i) => {
+        actorX.push(cursor + actorW[i] / 2);
+        card.style.left = cursor + 'px';
+        card.style.width = actorW[i] + 'px';
+        cursor += actorW[i] + actorGapX + perGap;
+      });
+      const stageW = cursor + padding - actorGapX - perGap;
+      const stageH = headerGapY + stepGapY * f.steps.length + padding;
+
+      stage.style.width  = stageW + 'px';
+      stage.style.height = stageH + 'px';
+      lifeSvg.setAttribute('width',  stageW);
+      lifeSvg.setAttribute('height', stageH);
+      lifeSvg.setAttribute('viewBox', `0 0 ${stageW} ${stageH}`);
+      msgSvg.setAttribute('width',  stageW);
+      msgSvg.setAttribute('height', stageH);
+      msgSvg.setAttribute('viewBox', `0 0 ${stageW} ${stageH}`);
+
+      // Lifelines: dashed vertical lines down each actor's column.
+      while (lifeSvg.firstChild) lifeSvg.removeChild(lifeSvg.firstChild);
+      actorX.forEach((x) => {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x); line.setAttribute('x2', x);
+        line.setAttribute('y1', 0); line.setAttribute('y2', stageH);
+        line.setAttribute('class', 'flow-seq__lifeline');
+        lifeSvg.appendChild(line);
+      });
+
+      // Messages.
+      while (msgSvg.firstChild) msgSvg.removeChild(msgSvg.firstChild);
+      appendArrowDef(msgSvg);
+      const actorIdx = new Map(f.actors.map((a, i) => [a.id, i]));
+
+      f.steps.forEach((s, i) => {
+        const fi = actorIdx.get(s.from);
+        const ti = actorIdx.get(s.to);
+        if (fi == null || ti == null) return;
+        const y = headerGapY + stepGapY * (i + 0.5);
+        const isSelf = fi === ti;
+        let path, labelX, labelAnchor;
+
+        if (isSelf) {
+          // Self-message: small loop to the right of the lifeline.
+          const x = actorX[fi];
+          path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          const d = `M ${x} ${y - 8} L ${x + 36} ${y - 8} L ${x + 36} ${y + 8} L ${x + 4} ${y + 8}`;
+          path.setAttribute('d', d);
+          labelX = x + 40;
+          labelAnchor = 'start';
+        } else {
+          const fx = actorX[fi];
+          const tx = actorX[ti];
+          path = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          path.setAttribute('x1', fx); path.setAttribute('y1', y);
+          path.setAttribute('x2', tx); path.setAttribute('y2', y);
+          // Anchor labels to the SOURCE side (in the direction of the arrow)
+          // so they never extend past the canvas edge. The label flows toward
+          // the target, where there's always space inside the diagram.
+          const goingRight = tx > fx;
+          labelX = goingRight ? fx + 8 : fx - 8;
+          labelAnchor = goingRight ? 'start' : 'end';
+        }
+        path.setAttribute('marker-end', 'url(#edge-arrow)');
+        path.setAttribute('class', 'flow-seq__msg' + (s.changed ? ' is-changed' : ''));
+        msgSvg.appendChild(path);
+
+        // Truncate based on actual horizontal room available for the label,
+        // approximated as 7.2px per mono char.
+        const availW = isSelf
+          ? 140
+          : Math.abs(actorX[ti] - actorX[fi]) - 16;
+        const maxChars = Math.max(20, Math.floor(availW / 7.2));
+        const truncated = s.label.length > maxChars
+          ? s.label.slice(0, maxChars - 1) + '…'
+          : s.label;
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', labelX);
+        text.setAttribute('y', y - 6);
+        text.setAttribute('text-anchor', labelAnchor);
+        text.setAttribute('class', 'flow-seq__label');
+        text.textContent = truncated;
+        if (truncated !== s.label) {
+          const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+          t.textContent = s.label;
+          text.appendChild(t);
+        }
+        msgSvg.appendChild(text);
+
+        // Tiny step number on the source side so timing is unambiguous.
+        const num = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        num.setAttribute('x', actorX[fi] + (isSelf ? 0 : (actorX[ti] > actorX[fi] ? 10 : -10)));
+        num.setAttribute('y', y + 4);
+        num.setAttribute('text-anchor', isSelf ? 'middle' : (actorX[ti] > actorX[fi] ? 'start' : 'end'));
+        num.setAttribute('class', 'flow-seq__num');
+        num.textContent = (i + 1).toString();
+        msgSvg.appendChild(num);
+
+        // Hit target for the detail panel — a transparent rect over the row.
+        const hit = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        hit.setAttribute('x', Math.min(labelX - 100, actorX[Math.min(fi,ti)]));
+        hit.setAttribute('y', y - 18);
+        hit.setAttribute('width', Math.max(200, Math.abs(actorX[ti] - actorX[fi]) + 40));
+        hit.setAttribute('height', 28);
+        hit.setAttribute('fill', 'transparent');
+        hit.style.cursor = 'pointer';
+        hit.addEventListener('click', () => {
+          const fromLabel = f.actors[fi]?.label || s.from;
+          const toLabel   = f.actors[ti]?.label || s.to;
+          openDetail(
+            `<h3>Step ${i + 1}: ${escapeHTML(s.label)}</h3>` +
+            `<p><strong>${escapeHTML(fromLabel)}</strong> → <strong>${escapeHTML(toLabel)}</strong></p>` +
+            (s.changed ? `<p><span class="status-chip is-changed">~ changed</span></p>` : '')
+          );
+        });
+        msgSvg.appendChild(hit);
+      });
+    });
   }
   function renderDatabase(host, d) {
     const { canvas, scene, edges, pz } = mountCanvas(host);
