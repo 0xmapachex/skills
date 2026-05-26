@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Overview (Visual)"
+  short_description: "Interactive HTML overview of a PR with UML, flow, ER, and observations"
+  default_prompt: "Use $pr-overview to generate a full interactive HTML overview of the current PR. Read the SKILL.md for the contract; emit tmp/pr-overview-spec.json then render to tmp/pr-overview.html."

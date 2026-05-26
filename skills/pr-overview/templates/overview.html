@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PR Overview</title>
+  <style>/* __INLINE_CSS__ */</style>
+</head>
+<body>
+  <header class="pr-header">
+    <div class="pr-header__left">
+      <h1 class="pr-header__title" data-bind="meta.title"></h1>
+      <div class="pr-header__meta">
+        <span class="chip" data-bind="meta.base"></span>
+        <span class="chip chip--arrow">→</span>
+        <span class="chip" data-bind="meta.head"></span>
+        <span class="chip chip--muted" data-bind="meta.files_changed" data-suffix=" files"></span>
+        <span class="chip chip--add" data-bind="meta.additions" data-prefix="+"></span>
+        <span class="chip chip--del" data-bind="meta.deletions" data-prefix="−"></span>
+      </div>
+      <div class="pr-header__tags" data-list="meta.pr_type_tags" data-item-class="chip chip--tag"></div>
+    </div>
+    <div class="pr-header__right">
+      <button type="button" data-theme-toggle aria-label="Toggle theme">◐</button>
+    </div>
+  </header>
+
+  <main class="pr-main">
+    <!-- Section renderers mount themselves in here based on which keys are present in the spec. -->
+  </main>
+
+  <aside class="detail-panel" data-detail-panel hidden>
+    <button type="button" class="detail-panel__close" data-detail-close aria-label="Close panel">×</button>
+    <div class="detail-panel__body" data-detail-body></div>
+  </aside>
+
+  <script>window.__PR_OVERVIEW_DATA__ = /* __INLINE_DATA__ */ null;</script>
+  <script>/* __INLINE_JS__ */</script>
+</body>
+</html>

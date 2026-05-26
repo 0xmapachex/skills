@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/0xmapachex/skills/pr-overview/schema",
+  "title": "PR Overview Spec",
+  "type": "object",
+  "required": ["meta", "summary", "architecture", "open_questions"],
+  "additionalProperties": false,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["title", "base", "head", "files_changed", "additions", "deletions"],
+      "properties": {
+        "title":         { "type": "string", "minLength": 1 },
+        "base":          { "type": "string", "minLength": 1 },
+        "head":          { "type": "string", "minLength": 1 },
+        "files_changed": { "type": "integer", "minimum": 0 },
+        "additions":     { "type": "integer", "minimum": 0 },
+        "deletions":     { "type": "integer", "minimum": 0 },
+        "pr_type_tags":  { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["bullets"],
+      "properties": {
+        "bullets": { "type": "array", "minItems": 1, "maxItems": 7, "items": { "type": "string" } }
+      }
+    },
+    "architecture": {
+      "type": "object",
+      "required": ["nodes", "edges"],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "kind"],
+            "properties": {
+              "id":      { "type": "string" },
+              "label":   { "type": "string" },
+              "kind":    { "enum": ["service", "module", "datastore", "external", "ui", "job"] },
+              "changed": { "type": "boolean" }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from":  { "type": "string" },
+              "to":    { "type": "string" },
+              "label": { "type": "string" },
+              "kind":  { "enum": ["sync", "async", "data"] }
+            }
+          }
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "summary":          { "type": "string" },
+              "files":            { "type": "array", "items": { "type": "string" } },
+              "responsibilities": { "type": "array", "items": { "type": "string" } },
+              "status":           { "enum": ["added", "changed", "removed", "context"] }
+            }
+          }
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "required": ["actors", "steps"],
+      "properties": {
+        "actors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "label"],
+            "properties": {
+              "id":    { "type": "string" },
+              "label": { "type": "string" },
+              "kind":  { "enum": ["user", "service", "module", "datastore", "external"] }
+            }
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "label"],
+            "properties": {
+              "from":        { "type": "string" },
+              "to":          { "type": "string" },
+              "label":       { "type": "string" },
+              "changed":     { "type": "boolean" },
+              "details_id":  { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "required": ["tables"],
+      "properties": {
+        "tables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "status", "fields"],
+            "properties": {
+              "id":     { "type": "string" },
+              "name":   { "type": "string" },
+              "status": { "enum": ["added", "changed", "removed", "context"] },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "type", "status"],
+                  "properties": {
+                    "name":     { "type": "string" },
+                    "type":     { "type": "string" },
+                    "status":   { "enum": ["added", "changed", "removed", "context"] },
+                    "nullable": { "type": "boolean" },
+                    "default":  { "type": "string" },
+                    "privacy":  { "type": "boolean" }
+                  }
+                }
+              },
+              "indexes": { "type": "array", "items": { "type": "object" } },
+              "details": { "type": "object" }
+            }
+          }
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to"],
+            "properties": {
+              "from":   { "type": "string" },
+              "to":     { "type": "string" },
+              "status": { "enum": ["added", "changed", "removed", "context"] }
+            }
+          }
+        }
+      }
+    },
+    "code_observations": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "required": ["title", "kind"],
+            "properties": {
+              "title": { "type": "string" },
+              "kind":  { "enum": ["pattern", "risky-spot", "suggestion"] },
+              "files": { "type": "array", "items": { "type": "string" } },
+              "note":  { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "risk_rollout": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title", "severity", "notes"],
+            "properties": {
+              "title":    { "type": "string" },
+              "severity": { "enum": ["info", "watch", "careful"] },
+              "notes":    { "type": "string" },
+              "files":    { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}
