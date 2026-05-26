@@ -215,7 +215,34 @@
       `;
     }
   }
-  function renderFlow(host, f)            { /* Task 11 */ host.appendChild(el('div', {}, 'flow')); }
+  function renderFlow(host, f) {
+    const wrap = el('div', { class: 'flow-lanes' });
+
+    const stepsByActor = new Map(f.actors.map((a) => [a.id, []]));
+    f.steps.forEach((s) => {
+      // Pin the step to its "from" actor's lane; reader can follow the arrow text to "to".
+      if (stepsByActor.has(s.from)) stepsByActor.get(s.from).push(s);
+    });
+
+    f.actors.forEach((a) => {
+      const lane = el('div', { class: 'flow-lane' }, [
+        el('div', { class: 'flow-lane__header' }, a.label),
+      ]);
+      (stepsByActor.get(a.id) || []).forEach((s) => {
+        const target = f.actors.find((x) => x.id === s.to)?.label || s.to;
+        const step = el('div', {
+          class: 'flow-step' + (s.changed ? ' is-changed' : ''),
+        }, `${s.label} → ${target}`);
+        step.addEventListener('click', () => {
+          openDetail(`<h3>${escapeHTML(s.label)}</h3><p><code>${escapeHTML(s.from)}</code> → <code>${escapeHTML(s.to)}</code></p>`);
+        });
+        lane.appendChild(step);
+      });
+      wrap.appendChild(lane);
+    });
+
+    host.appendChild(wrap);
+  }
   function renderDatabase(host, d) {
     const { canvas, scene, edges } = mountCanvas(host);
 
