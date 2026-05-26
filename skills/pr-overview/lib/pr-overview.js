@@ -491,29 +491,28 @@
     svgEl.style.maxWidth = 'none';
     svgEl.style.display = 'block';
 
-    // Nudge every edge label up so it sits clearly above the line rather
-    // than centered on it. Mermaid's default is dominant-baseline=central
-    // (text midline on path), so we need ~14-16px of dy to clear the line
-    // plus the descender. Also expose the full label as <title> on hover.
-    svgEl.querySelectorAll('g.edgeLabel text, text.edgeLabel, g.edgeLabel tspan').forEach((t) => {
-      t.setAttribute('dy', '-14');
-      const text = t.textContent || '';
-      const original = a.edges.find((e) => e.label && (
-        e.label === text || (e.label.length > text.length && text.endsWith('…'))
-      ))?.label;
-      if (original && original !== text) {
-        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-        title.textContent = original;
-        t.appendChild(title);
-      }
-    });
-    // Belt-and-braces: also shift each .edgeLabel wrapper transform up by
-    // 14px so any internal positioning Mermaid does is offset cleanly.
+    // Lift each edge label above its line by translating the wrapper <g>.
+    // Do NOT add per-text dy — Mermaid puts each word on its own <text>
+    // sibling, so per-element dy would stack them into a staircase.
     svgEl.querySelectorAll('g.edgeLabel').forEach((g) => {
       if (g.dataset.prLifted) return; // idempotent across theme re-renders
       const cur = g.getAttribute('transform') || '';
-      g.setAttribute('transform', cur + ' translate(0,-14)');
+      g.setAttribute('transform', cur + ' translate(0,-12)');
       g.dataset.prLifted = '1';
+    });
+    // Expose the full label as <title> on the rendered text so the
+    // truncated 4-word version still surfaces the original on hover.
+    svgEl.querySelectorAll('g.edgeLabel').forEach((g) => {
+      const text = (g.textContent || '').trim();
+      if (!text) return;
+      const original = a.edges.find((e) => e.label && (
+        e.label === text || (e.label.length > text.length && text.endsWith('…'))
+      ))?.label;
+      if (original && original !== text && !g.querySelector('title')) {
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = original;
+        g.appendChild(title);
+      }
     });
 
     if (typeof window.panzoom === 'function') {
