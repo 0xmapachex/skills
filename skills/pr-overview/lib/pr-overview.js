@@ -407,7 +407,11 @@
       window.mermaid.initialize({
         startOnLoad: false,
         securityLevel: 'loose', // needed for click call directives
-        flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false, nodeSpacing: 30, rankSpacing: 55, padding: 12 },
+        // htmlLabels:false → labels are real SVG <text>, which means we can
+        // use paint-order:stroke to mask the edge line where a label sits.
+        // HTML labels (the default) sit in a foreignObject above the line,
+        // so no text-shadow / background trick can actually cut the line.
+        flowchart: { htmlLabels: false, curve: 'basis', useMaxWidth: false, nodeSpacing: 30, rankSpacing: 55, padding: 12 },
         theme: 'base',
         themeVariables: paper ? {
           fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',

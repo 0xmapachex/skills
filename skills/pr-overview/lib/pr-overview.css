@@ -515,42 +515,26 @@ details.spec summary .dot {
   text-transform: uppercase;
   fill: var(--ink) !important;
 }
-/* Edge labels — transparent background everywhere (the SVG rect, the HTML
-   wrapper, and every inner span). To keep text readable where the edge
-   crosses underneath, paint a thick "halo" in the canvas surface color
-   using text-shadow, so the edge line is visually broken beneath the
-   label. Same technique a real UML diagram uses, no sticker blocks. */
+/* Edge labels (SVG <text>, htmlLabels:false). The paint-order:stroke
+   trick draws each glyph's stroke FIRST, then the fill on top — so the
+   surface-colored stroke physically covers the edge line where the
+   label sits. Real "line breaks at label" effect, no sticker block. */
 .mmd-inner svg .edgeLabel,
-.mmd-inner svg .edgeLabel *,
-.mmd-inner svg foreignObject .edgeLabel,
-.mmd-inner svg .edgeLabels .edgeLabel {
-  background: transparent !important;
-  background-color: transparent !important;
-}
-.mmd-inner svg .labelBkg,
-.mmd-inner svg .edgeLabel rect.labelBkg,
-.mmd-inner svg .edgePath .edgeLabel rect {
-  fill: transparent !important;
-}
-.mmd-inner svg .edgeLabel {
+.mmd-inner svg text.edgeLabel,
+.mmd-inner svg .edgeLabel text {
   font-family: var(--mono) !important;
   font-size: 11.5px !important;
-  padding: 0 !important;
-  border-radius: 0;
+  fill: var(--ink) !important;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 5px;
+  stroke-linejoin: round;
 }
-.mmd-inner svg .edgeLabel,
-.mmd-inner svg .edgeLabel span,
-.mmd-inner svg .edgeLabel p,
-.mmd-inner svg .edgeLabel div {
-  text-shadow:
-    -2px -2px 0 var(--surface),
-     2px -2px 0 var(--surface),
-    -2px  2px 0 var(--surface),
-     2px  2px 0 var(--surface),
-     0   -2px 0 var(--surface),
-     0    2px 0 var(--surface),
-    -2px  0   0 var(--surface),
-     2px  0   0 var(--surface);
+/* Kill any rect Mermaid still draws behind the label. */
+.mmd-inner svg .labelBkg,
+.mmd-inner svg .edgeLabel rect.labelBkg,
+.mmd-inner svg .edgeLabels rect {
+  fill: transparent !important;
 }
 .mmd-inner svg .node[id*="n_"] rect,
 .mmd-inner svg .node[id*="n_"] polygon {
