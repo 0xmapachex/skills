@@ -36,19 +36,20 @@ export function validate(spec) {
     if (!ALLOWED.has(k)) push('$', `unknown key: ${k}`);
   }
 
-  if (isObj(spec.meta)) validateMeta(spec.meta, push);
-  if (isObj(spec.summary)) validateSummary(spec.summary, push);
-  if (isObj(spec.architecture)) validateArchitecture(spec.architecture, push);
-  if ('flow' in spec) validateFlow(spec.flow, push);
-  if ('database' in spec) validateDatabase(spec.database, push);
+  if ('meta' in spec)              validateMeta(spec.meta, push);
+  if ('summary' in spec)           validateSummary(spec.summary, push);
+  if ('architecture' in spec)      validateArchitecture(spec.architecture, push);
+  if ('flow' in spec)              validateFlow(spec.flow, push);
+  if ('database' in spec)          validateDatabase(spec.database, push);
   if ('code_observations' in spec) validateCodeObservations(spec.code_observations, push);
-  if ('risk_rollout' in spec) validateRiskRollout(spec.risk_rollout, push);
-  if ('open_questions' in spec) validateOpenQuestions(spec.open_questions, push);
+  if ('risk_rollout' in spec)      validateRiskRollout(spec.risk_rollout, push);
+  if ('open_questions' in spec)    validateOpenQuestions(spec.open_questions, push);
 
   return { valid: errors.length === 0, errors };
 }
 
 function validateMeta(m, push) {
+  if (!isObj(m)) { push('meta', 'must be object'); return; }
   const required = {
     title: isStr, base: isStr, head: isStr,
     files_changed: isInt, additions: isInt, deletions: isInt,
@@ -66,12 +67,14 @@ function validateMeta(m, push) {
 }
 
 function validateSummary(s, push) {
+  if (!isObj(s)) { push('summary', 'must be object'); return; }
   if (!Array.isArray(s.bullets)) { push('summary.bullets', 'must be array'); return; }
   if (s.bullets.length < 1 || s.bullets.length > 7) push('summary.bullets', 'must have 1-7 items');
   s.bullets.forEach((b, i) => { if (!isStr(b)) push(`summary.bullets[${i}]`, 'must be string'); });
 }
 
 function validateArchitecture(a, push) {
+  if (!isObj(a)) { push('architecture', 'must be object'); return; }
   if (!Array.isArray(a.nodes)) push('architecture.nodes', 'must be array');
   else a.nodes.forEach((n, i) => {
     const p = `architecture.nodes[${i}]`;
@@ -143,7 +146,8 @@ function validateDatabase(d, push) {
 }
 
 function validateCodeObservations(c, push) {
-  if (!isObj(c) || !Array.isArray(c.items)) { push('code_observations.items', 'must be array'); return; }
+  if (!isObj(c)) { push('code_observations', 'must be object'); return; }
+  if (!Array.isArray(c.items)) { push('code_observations.items', 'must be array'); return; }
   if (c.items.length > 5) push('code_observations.items', 'max 5 items');
   c.items.forEach((it, i) => {
     const p = `code_observations.items[${i}]`;
@@ -153,7 +157,8 @@ function validateCodeObservations(c, push) {
 }
 
 function validateRiskRollout(r, push) {
-  if (!isObj(r) || !Array.isArray(r.items)) { push('risk_rollout.items', 'must be array'); return; }
+  if (!isObj(r)) { push('risk_rollout', 'must be object'); return; }
+  if (!Array.isArray(r.items)) { push('risk_rollout.items', 'must be array'); return; }
   r.items.forEach((it, i) => {
     const p = `risk_rollout.items[${i}]`;
     if (!isStr(it.title)) push(`${p}.title`, 'required string');
@@ -163,7 +168,8 @@ function validateRiskRollout(r, push) {
 }
 
 function validateOpenQuestions(o, push) {
-  if (!isObj(o) || !Array.isArray(o.items)) { push('open_questions.items', 'must be array'); return; }
+  if (!isObj(o)) { push('open_questions', 'must be object'); return; }
+  if (!Array.isArray(o.items)) { push('open_questions.items', 'must be array'); return; }
   o.items.forEach((q, i) => {
     if (!isStr(q)) push(`open_questions.items[${i}]`, 'must be string');
   });

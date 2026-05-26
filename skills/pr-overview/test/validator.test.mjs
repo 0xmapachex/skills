@@ -61,3 +61,31 @@ test('rejects more than 5 code_observations items', () => {
   const { errors } = validate(bad);
   assert.ok(errors.some((e) => /code_observations\.items/.test(e)), errors.join('\n'));
 });
+
+test('rejects required section with wrong type (summary as array)', () => {
+  const bad = { ...FIXTURE, summary: [] };
+  const { errors, valid } = validate(bad);
+  assert.equal(valid, false);
+  assert.ok(errors.some((e) => /^summary: must be object/.test(e)), errors.join('\n'));
+});
+
+test('rejects required section with wrong type (meta as string)', () => {
+  const bad = { ...FIXTURE, meta: 'oops' };
+  const { errors, valid } = validate(bad);
+  assert.equal(valid, false);
+  assert.ok(errors.some((e) => /^meta: must be object/.test(e)), errors.join('\n'));
+});
+
+test('rejects optional section with wrong type (code_observations as string)', () => {
+  const bad = { ...FIXTURE, code_observations: 'bad' };
+  const { errors, valid } = validate(bad);
+  assert.equal(valid, false);
+  assert.ok(errors.some((e) => /^code_observations: must be object/.test(e)), errors.join('\n'));
+});
+
+test('rejects architecture as null', () => {
+  const bad = { ...FIXTURE, architecture: null };
+  const { errors, valid } = validate(bad);
+  assert.equal(valid, false);
+  assert.ok(errors.some((e) => /^architecture: must be object/.test(e)), errors.join('\n'));
+});
