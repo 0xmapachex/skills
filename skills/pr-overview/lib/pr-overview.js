@@ -216,7 +216,59 @@
     }
   }
   function renderFlow(host, f)            { /* Task 11 */ host.appendChild(el('div', {}, 'flow')); }
-  function renderDatabase(host, d)        { /* Task 10 */ host.appendChild(el('div', {}, 'database')); }
+  function renderDatabase(host, d) {
+    const { canvas, scene, edges } = mountCanvas(host);
+
+    const positions = layoutGrid(d.tables.map((t) => ({ id: t.id })), d.relations || []);
+    const byId = new Map();
+
+    d.tables.forEach((t) => {
+      const card = el('div', {
+        class: `node is-${t.status}`,
+        style: `left:${positions[t.id].x}px; top:${positions[t.id].y}px; min-width:240px;`,
+      }, [
+        el('div', { class: 'node__head' }, [
+          el('span', { class: 'node__kind' }, 'tbl'),
+          el('span', {}, t.name),
+          t.status !== 'context' ? el('span', { class: `status-chip is-${t.status}` }, ({ added: '+ added', changed: '~ changed', removed: '− removed' })[t.status]) : null,
+        ]),
+        el('div', { class: 'node__body', style: 'padding:0;' },
+          t.fields.map((f) => {
+            // Explicit class strings to ease testability:
+            const explicit = f.status === 'added' ? 'field-row is-added'
+                            : f.status === 'changed' ? 'field-row is-changed'
+                            : f.status === 'removed' ? 'field-row is-removed'
+                            : 'field-row';
+            return el('div', { class: explicit + (f.privacy ? ' is-privacy' : '') }, [
+              el('span', { class: 'field-row__name' }, f.name),
+              el('span', { class: 'field-row__type' }, f.type),
+              f.status !== 'context' ? el('span', { class: `status-chip is-${f.status}` }, f.status) : null,
+            ]);
+          })
+        ),
+      ]);
+      card.setAttribute('data-detail-source', t.id);
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openDetail(detailForTable(t));
+      });
+      scene.appendChild(card);
+      byId.set(t.id, card);
+    });
+
+    requestAnimationFrame(() => drawRelations(d.relations || [], byId, edges));
+
+    function detailForTable(t) {
+      const fields = t.fields.map((f) => `<li><code>${escapeHTML(f.name)}</code> · ${escapeHTML(f.type)} · <em>${escapeHTML(f.status)}</em></li>`).join('');
+      const details = t.details || {};
+      const detailLines = Object.entries(details).map(([k, v]) => `<p><strong>${escapeHTML(k)}:</strong> ${escapeHTML(String(v))}</p>`).join('');
+      return `
+        <h3>${escapeHTML(t.name)} <span class="status-chip is-${t.status}">${escapeHTML(t.status)}</span></h3>
+        <h4>Fields</h4><ul>${fields}</ul>
+        ${detailLines || ''}
+      `;
+    }
+  }
   function renderCodeObservations(host, c){ /* Task 12 */ host.appendChild(el('div', {}, 'code_observations')); }
   function renderRiskRollout(host, r)     { /* Task 12 */ host.appendChild(el('div', {}, 'risk_rollout')); }
   function renderOpenQuestions(host, o)   { /* Task 12 */ host.appendChild(el('div', {}, 'open_questions')); }
@@ -251,6 +303,25 @@
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', `M ${fx} ${fy} C ${cx} ${fy}, ${cx} ${ty}, ${tx} ${ty}`);
       if (e.kind === 'async') path.classList.add('is-async');
+      svg.appendChild(path);
+    });
+  }
+
+  function drawRelations(relations, byId, svg) {
+    relations.forEach((r) => {
+      const fromTable = r.from.split('.')[0];
+      const toTable   = r.to.split('.')[0];
+      const fromCard  = byId.get(fromTable);
+      const toCard    = byId.get(toTable);
+      if (!fromCard || !toCard) return;
+      const fx = parseFloat(fromCard.style.left) + fromCard.offsetWidth;
+      const fy = parseFloat(fromCard.style.top)  + fromCard.offsetHeight / 2;
+      const tx = parseFloat(toCard.style.left);
+      const ty = parseFloat(toCard.style.top)    + toCard.offsetHeight / 2;
+      const cx = (fx + tx) / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${fx} ${fy} C ${cx} ${fy}, ${cx} ${ty}, ${tx} ${ty}`);
+      if (r.status === 'removed') path.classList.add('is-dimmed');
       svg.appendChild(path);
     });
   }

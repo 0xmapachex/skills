@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "title": "feat(db): add channel routing columns to proposals",
+    "base": "main",
+    "head": "HEAD",
+    "files_changed": 4,
+    "additions": 62,
+    "deletions": 0,
+    "pr_type_tags": ["db-schema", "migration"]
+  },
+  "summary": {
+    "bullets": [
+      "Adds channel_id and is_inferred to the proposals table to support inferred Slack channel routing.",
+      "Adds an index on (tenant_id, channel_id) for the new lookup path.",
+      "Backfill: existing rows get channel_id=NULL, is_inferred=false."
+    ]
+  },
+  "architecture": {
+    "nodes": [
+      { "id": "migration", "label": "drizzle/migrations/0007", "kind": "module",    "changed": true },
+      { "id": "schema",    "label": "drizzle/schema.ts",        "kind": "module",    "changed": true },
+      { "id": "db",        "label": "Cloud SQL Postgres",       "kind": "datastore", "changed": true }
+    ],
+    "edges": [
+      { "from": "migration", "to": "db",     "label": "DDL", "kind": "sync" },
+      { "from": "schema",    "to": "db",     "label": "queries", "kind": "data" }
+    ],
+    "details": {
+      "migration": { "summary": "Drizzle-generated migration. Order-sensitive: ADD COLUMN before CREATE INDEX.", "status": "added" },
+      "schema":    { "summary": "Drizzle schema; updated alongside the migration.", "status": "changed" },
+      "db":        { "summary": "Production Postgres; cloud-sql-proxy in dev.", "status": "context" }
+    }
+  },
+  "database": {
+    "tables": [
+      {
+        "id": "proposals",
+        "name": "proposals",
+        "status": "changed",
+        "fields": [
+          { "name": "id",          "type": "uuid",      "status": "context",  "nullable": false },
+          { "name": "tenant_id",   "type": "uuid",      "status": "context",  "nullable": false },
+          { "name": "channel_id",  "type": "text",      "status": "added",    "nullable": true },
+          { "name": "is_inferred", "type": "boolean",   "status": "added",    "nullable": false, "default": "false" }
+        ],
+        "details": {
+          "purpose": "One row per Safe transaction the agent has proposed.",
+          "writers": "lib/tool-handlers.ts::handleProposeTx",
+          "readers": "admin dashboard, review-mode card builder"
+        }
+      },
+      {
+        "id": "tenants",
+        "name": "tenants",
+        "status": "context",
+        "fields": [
+          { "name": "id",   "type": "uuid", "status": "context", "nullable": false },
+          { "name": "name", "type": "text", "status": "context", "nullable": false }
+        ]
+      }
+    ],
+    "relations": [
+      { "from": "proposals.tenant_id", "to": "tenants.id", "status": "context" }
+    ]
+  },
+  "risk_rollout": {
+    "items": [
+      {
+        "title": "ADD COLUMN before CREATE INDEX",
+        "severity": "watch",
+        "notes": "Generated migration sometimes emits ADD COLUMN AFTER index statements that reference the column. Hand-edit if so.",
+        "files": ["drizzle/migrations/0007_add_channel_routing.sql"]
+      },
+      {
+        "title": "Backfill NULL channel_id",
+        "severity": "info",
+        "notes": "Existing rows get NULL; reads must tolerate missing channel."
+      }
+    ]
+  },
+  "open_questions": {
+    "items": [
+      "Should is_inferred default differ in dev vs prod for back-tests?",
+      "Confirm the index is single-key (tenant_id, channel_id) and not (channel_id, tenant_id)."
+    ]
+  }
+}
