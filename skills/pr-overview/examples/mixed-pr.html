@@ -1432,16 +1432,13 @@ div.node--draggable.is-dragging { cursor: grabbing; }
     svgEl.style.maxWidth = 'none';
     svgEl.style.display = 'block';
 
-    // Nudge every edge label up so it sits above the line instead of
-    // crossing through the glyphs. Mermaid centers labels on the path;
-    // a 7px upward dy gives them a clear vertical gap from the line.
-    // Also expose the full label as <title> on hover so the truncated
-    // text doesn't lose information.
-    svgEl.querySelectorAll('g.edgeLabel text, text.edgeLabel').forEach((t) => {
-      t.setAttribute('dy', '-7');
+    // Nudge every edge label up so it sits clearly above the line rather
+    // than centered on it. Mermaid's default is dominant-baseline=central
+    // (text midline on path), so we need ~14-16px of dy to clear the line
+    // plus the descender. Also expose the full label as <title> on hover.
+    svgEl.querySelectorAll('g.edgeLabel text, text.edgeLabel, g.edgeLabel tspan').forEach((t) => {
+      t.setAttribute('dy', '-14');
       const text = t.textContent || '';
-      // Match this rendered text back to its source edge label so the
-      // full untruncated string can be shown in a tooltip.
       const original = a.edges.find((e) => e.label && (
         e.label === text || (e.label.length > text.length && text.endsWith('…'))
       ))?.label;
@@ -1450,6 +1447,14 @@ div.node--draggable.is-dragging { cursor: grabbing; }
         title.textContent = original;
         t.appendChild(title);
       }
+    });
+    // Belt-and-braces: also shift each .edgeLabel wrapper transform up by
+    // 14px so any internal positioning Mermaid does is offset cleanly.
+    svgEl.querySelectorAll('g.edgeLabel').forEach((g) => {
+      if (g.dataset.prLifted) return; // idempotent across theme re-renders
+      const cur = g.getAttribute('transform') || '';
+      g.setAttribute('transform', cur + ' translate(0,-14)');
+      g.dataset.prLifted = '1';
     });
 
     if (typeof window.panzoom === 'function') {
