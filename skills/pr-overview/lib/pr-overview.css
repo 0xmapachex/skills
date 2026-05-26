@@ -599,14 +599,6 @@ details.spec summary .dot {
   box-shadow: var(--shadow-lift);
 }
 .node.is-dimmed { opacity: 0.3; transition: opacity .12s ease; }
-.node.is-dragging {
-  cursor: grabbing;
-  box-shadow: var(--shadow-lift);
-  z-index: 5;
-  user-select: none;
-}
-.node--draggable { cursor: grab; }
-.node--draggable:hover { cursor: grab; }
 .node__head {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px;

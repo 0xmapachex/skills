@@ -656,13 +656,13 @@
 
   function renderDatabase(host, d) {
     host.appendChild(el('p', {}, [
-      el('span', {}, 'Tables and columns this branch adds, changes, or removes. '),
-      el('strong', {}, 'Drag any table '),
-      el('span', {}, 'to reposition it — relations re-route automatically. Field rows are color-coded; amber strips mark privacy-sensitive fields.'),
+      el('span', {}, 'Tables and columns this branch adds, changes, or removes. Field rows are color-coded — green rows are new, blue are modified — and amber strips mark privacy-sensitive fields. '),
+      el('strong', {}, 'Click any table '),
+      el('span', {}, 'for its full field list and write/read paths.'),
     ]));
 
     const wrap = mountCanvas(host);
-    wrap.canvas.appendChild(el('div', { class: 'canvas__hint' }, 'drag tables · hover to focus · ctrl + wheel to zoom'));
+    wrap.canvas.appendChild(el('div', { class: 'canvas__hint' }, 'hover to focus · ctrl + wheel to zoom · drag empty canvas to pan'));
 
     const byId = new Map();
     const links = (d.relations || []).map((r) => ({
@@ -673,7 +673,7 @@
 
     d.tables.forEach((t) => {
       const card = el('div', {
-        class: `node node--draggable is-${t.status}`,
+        class: `node is-${t.status}`,
         style: 'min-width:260px;',
       }, [
         el('div', { class: 'node__head' }, [
@@ -710,7 +710,6 @@
         nodes: d.tables, links,
         drawLink: drawRelationEdge,
       });
-      wireDrag(wrap, byId, links, drawRelationEdge);
       if (wrap.pz) fitToContent(wrap.pz, wrap.scene, wrap.canvas);
     });
 
@@ -802,8 +801,6 @@
       pz = window.panzoom(scene, {
         smoothScroll: false,
         beforeWheel: (e) => !e.ctrlKey && !e.metaKey,
-        // Allow card-internal drag handlers to take precedence over canvas pan.
-        beforeMouseDown: (e) => !!e.target.closest?.('.node--draggable'),
       });
     }
     controls.addEventListener('click', (e) => {
@@ -943,69 +940,6 @@
     cards.forEach((c) => c.addEventListener('mouseenter', () => focus(c.getAttribute('data-detail-source'))));
     const cv = scene.parentElement;
     if (cv) cv.addEventListener('mouseleave', clear);
-  }
-
-  function wireDrag(wrap, byId, links, drawLink) {
-    const scene = wrap.scene;
-    const edges = wrap.edges;
-    const cards = Array.from(scene.querySelectorAll('.node--draggable'));
-    let drag = null;
-    cards.forEach((card) => {
-      card.addEventListener('mousedown', (e) => {
-        // Only initiate drag on left button + on the card chrome (not field rows).
-        if (e.button !== 0) return;
-        e.stopPropagation();
-        e.preventDefault();
-        const sceneRect = scene.getBoundingClientRect();
-        const scale = sceneRect.width / scene.offsetWidth || 1;
-        drag = {
-          card,
-          startX: e.clientX,
-          startY: e.clientY,
-          origLeft: parseFloat(card.style.left || 0),
-          origTop:  parseFloat(card.style.top  || 0),
-          scale,
-        };
-        card.classList.add('is-dragging');
-      });
-    });
-    document.addEventListener('mousemove', (e) => {
-      if (!drag) return;
-      const dx = (e.clientX - drag.startX) / drag.scale;
-      const dy = (e.clientY - drag.startY) / drag.scale;
-      drag.card.style.left = (drag.origLeft + dx) + 'px';
-      drag.card.style.top  = (drag.origTop  + dy) + 'px';
-      // Re-render edges live while dragging.
-      redrawEdges(edges, byId, links, drawLink);
-      scene.appendChild(edges); // keep edges painted over cards
-    });
-    document.addEventListener('mouseup', () => {
-      if (!drag) return;
-      drag.card.classList.remove('is-dragging');
-      // Final redraw + extend scene if the card moved past the edge.
-      growSceneToFit(scene, edges);
-      redrawEdges(edges, byId, links, drawLink);
-      scene.appendChild(edges);
-      drag = null;
-    });
-  }
-
-  function growSceneToFit(scene, edges) {
-    let maxRight = 0, maxBottom = 0;
-    Array.from(scene.children).forEach((c) => {
-      if (!c.classList?.contains('node')) return;
-      const right  = parseFloat(c.style.left || 0) + c.offsetWidth;
-      const bottom = parseFloat(c.style.top  || 0) + c.offsetHeight;
-      if (right > maxRight)   maxRight = right;
-      if (bottom > maxBottom) maxBottom = bottom;
-    });
-    const w = Math.max(scene.offsetWidth, maxRight + 60);
-    const h = Math.max(scene.offsetHeight, maxBottom + 60);
-    scene.style.width  = w + 'px';
-    scene.style.height = h + 'px';
-    edges.setAttribute('width',  w);
-    edges.setAttribute('height', h);
-    edges.setAttribute('viewBox', `0 0 ${w} ${h}`);
   }
 
   // ---------- arrow def + edge drawers ----------
