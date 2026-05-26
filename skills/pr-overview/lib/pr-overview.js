@@ -356,7 +356,13 @@
       lines.push('  end');
     });
 
-    // Edges. Use stylistic differentiation by `kind`.
+    // Truncate edge labels to ≤4 words so they always sit cleanly on a
+    // single line. Full label still readable via the SVG <title> set
+    // post-render in wireMermaidInteractions.
+    const truncateLabel = (s) => {
+      const words = String(s).trim().split(/\s+/);
+      return words.length <= 4 ? words.join(' ') : words.slice(0, 3).join(' ') + '…';
+    };
     a.edges.forEach((e) => {
       const arrow =
         e.kind === 'async' ? '-. ' :
@@ -366,7 +372,7 @@
         e.kind === 'async' ? ' .-> ' :
         e.kind === 'data'  ? ' ==> ' :
                               ' --> ';
-      const label = e.label ? `"${esc(e.label)}"` : '';
+      const label = e.label ? `"${esc(truncateLabel(e.label))}"` : '';
       lines.push(`  ${sid(e.from)} ${arrow}${label}${close}${sid(e.to)}`);
     });
 
@@ -484,6 +490,26 @@
     }
     svgEl.style.maxWidth = 'none';
     svgEl.style.display = 'block';
+
+    // Nudge every edge label up so it sits above the line instead of
+    // crossing through the glyphs. Mermaid centers labels on the path;
+    // a 7px upward dy gives them a clear vertical gap from the line.
+    // Also expose the full label as <title> on hover so the truncated
+    // text doesn't lose information.
+    svgEl.querySelectorAll('g.edgeLabel text, text.edgeLabel').forEach((t) => {
+      t.setAttribute('dy', '-7');
+      const text = t.textContent || '';
+      // Match this rendered text back to its source edge label so the
+      // full untruncated string can be shown in a tooltip.
+      const original = a.edges.find((e) => e.label && (
+        e.label === text || (e.label.length > text.length && text.endsWith('…'))
+      ))?.label;
+      if (original && original !== text) {
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = original;
+        t.appendChild(title);
+      }
+    });
 
     if (typeof window.panzoom === 'function') {
       const pz = window.panzoom(svgEl, {
