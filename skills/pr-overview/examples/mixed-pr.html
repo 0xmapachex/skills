@@ -1485,16 +1485,30 @@ div.node--draggable.is-dragging { cursor: grabbing; }
     }
 
     // Wire drag on each cluster so reviewers can rearrange the layout.
-    wireClusterDrag(svgEl, a.edges);
+    wireClusterDrag(svgEl, a);
   }
 
-  // Make Mermaid g.cluster elements draggable. The cluster carries its
-  // label + rect + every nested node, all under one transform — so a
-  // single translate moves the whole subgraph as a unit. After each
-  // delta, we redraw the edges as straight orthogonal paths between
-  // the new node centers (Mermaid's pre-computed bezier curves were
-  // baked to the original positions, so they'd disconnect otherwise).
-  function wireClusterDrag(svgEl, edges) {
+  // Make Mermaid g.cluster elements draggable. Mermaid v11 keeps cluster
+  // rects in one <g> and nodes in a SIBLING <g class="nodes"> — so the
+  // cluster transform alone doesn't move the contained nodes. We resolve
+  // each cluster's members from the spec (cluster `g_<kind>` ↔ nodes with
+  // node.kind === kind) and translate the cluster rect + every member node
+  // together. After the drag, we redraw edges as straight orthogonal paths
+  // since Mermaid's pre-computed bezier curves were baked to the original
+  // positions.
+  function wireClusterDrag(svgEl, a) {
+    const edges = a.edges;
+
+    // Build cluster → member-node-id map from the spec.
+    const KIND_ORDER = ['ui', 'service', 'module', 'job', 'datastore', 'external'];
+    const sid = (s) => 'n_' + String(s).replace(/[^a-zA-Z0-9_]/g, '_');
+    const clusterMembers = new Map(); // clusterDomId -> [memberSid, ...]
+    KIND_ORDER.forEach((kind) => {
+      const members = a.nodes
+        .filter((n) => (n.kind || 'module') === kind)
+        .map((n) => sid(n.id));
+      if (members.length) clusterMembers.set('g_' + kind, members);
+    });
     // Tag every rendered edge with the source/target ids the spec used,
     // matching them by emission order (Mermaid renders edges in declaration
     // order, so spec edges[i] ↔ DOM edgePaths[i]).
@@ -1504,10 +1518,29 @@ div.node--draggable.is-dragging { cursor: grabbing; }
       if (!edge) return;
       const path = node.tagName === 'path' ? node : node.querySelector('path');
       if (!path) return;
-      const sid = (s) => 'n_' + String(s).replace(/[^a-zA-Z0-9_]/g, '_');
       path.dataset.archFrom = sid(edge.from);
       path.dataset.archTo   = sid(edge.to);
     });
+
+    // Capture the BASE transform of every node (Mermaid's auto-layout
+    // translate) so cluster-drag deltas can be added on top without
+    // accumulating across moves.
+    const nodeBase = new Map();
+    svgEl.querySelectorAll('g.node').forEach((n) => {
+      const m = (n.getAttribute('transform') || '').match(/translate\(\s*([-\d.]+)\s*[,\s]\s*([-\d.]+)\s*\)/);
+      nodeBase.set(n.id, {
+        tx: m ? parseFloat(m[1]) : 0,
+        ty: m ? parseFloat(m[2]) : 0,
+        offsetTx: 0, // accumulated cluster-drag offset
+        offsetTy: 0,
+      });
+    });
+    const findClusterNodes = (clusterDomId) => {
+      const memberSids = clusterMembers.get(clusterDomId) || [];
+      return memberSids
+        .map((s) => svgEl.querySelector(`g.node[id^="flowchart-${s}-"]`))
+        .filter(Boolean);
+    };
 
     // Cursor + mousedown handler per cluster.
     let drag = null;
@@ -1518,37 +1551,67 @@ div.node--draggable.is-dragging { cursor: grabbing; }
         if (e.target.closest('.node')) return; // node click takes precedence
         e.stopPropagation();
         e.preventDefault();
-        const cur = cluster.getAttribute('transform') || '';
-        const m = cur.match(/translate\(\s*([-\d.]+)\s*[,\s]\s*([-\d.]+)\s*\)/);
         const ctm = svgEl.getScreenCTM();
+        const curT = cluster.getAttribute('transform') || '';
+        const m = curT.match(/translate\(\s*([-\d.]+)\s*[,\s]\s*([-\d.]+)\s*\)/);
+        const nodes = findClusterNodes(cluster.id);
         drag = {
           cluster,
+          nodes, // DOM elements belonging to this cluster
           startX: e.clientX, startY: e.clientY,
-          baseTx: m ? parseFloat(m[1]) : 0,
-          baseTy: m ? parseFloat(m[2]) : 0,
-          // Scale factor so mouse pixels map to SVG units.
+          clusterBaseTx: m ? parseFloat(m[1]) : 0,
+          clusterBaseTy: m ? parseFloat(m[2]) : 0,
+          // Snapshot each node's existing total offset so we add the new
+          // delta on top of it.
+          nodeBaseOffsets: nodes.map((n) => {
+            const base = nodeBase.get(n.id);
+            return { tx: base.tx + base.offsetTx, ty: base.ty + base.offsetTy };
+          }),
           scale: ctm ? ctm.a : 1,
         };
         cluster.style.cursor = 'grabbing';
       });
     });
 
+    const setTranslate = (el, tx, ty) => {
+      const cur = el.getAttribute('transform') || '';
+      const newT = `translate(${tx}, ${ty})`;
+      el.setAttribute(
+        'transform',
+        /translate\(/.test(cur) ? cur.replace(/translate\([^)]+\)/, newT) : newT,
+      );
+    };
+
     const onMove = (e) => {
       if (!drag) return;
       const dx = (e.clientX - drag.startX) / drag.scale;
       const dy = (e.clientY - drag.startY) / drag.scale;
-      const newT = `translate(${drag.baseTx + dx}, ${drag.baseTy + dy})`;
-      // Preserve any other transform parts (rotate, scale) by replacing only
-      // the translate; if none existed, append.
-      const cur = drag.cluster.getAttribute('transform') || '';
-      drag.cluster.setAttribute(
-        'transform',
-        /translate\(/.test(cur) ? cur.replace(/translate\([^)]+\)/, newT) : newT,
-      );
+      // Move the cluster chrome.
+      setTranslate(drag.cluster, drag.clusterBaseTx + dx, drag.clusterBaseTy + dy);
+      // Move every member node by the same delta on top of its base.
+      drag.nodes.forEach((n, i) => {
+        const base = drag.nodeBaseOffsets[i];
+        setTranslate(n, base.tx + dx, base.ty + dy);
+      });
       redrawArchEdges(svgEl);
     };
     const onUp = () => {
       if (!drag) return;
+      const dx = drag.nodes.length
+        ? (parseFloat(drag.nodes[0].getAttribute('transform').match(/translate\(\s*([-\d.]+)/)[1]) - drag.nodeBaseOffsets[0].tx)
+        : 0;
+      const dy = drag.nodes.length
+        ? (parseFloat(drag.nodes[0].getAttribute('transform').match(/translate\([^,]+[,\s]\s*([-\d.]+)/)[1]) - drag.nodeBaseOffsets[0].ty)
+        : 0;
+      // Persist the accumulated cluster offset on each node so future drags
+      // add to it instead of resetting to the base.
+      drag.nodes.forEach((n) => {
+        const base = nodeBase.get(n.id);
+        if (base) {
+          base.offsetTx += dx;
+          base.offsetTy += dy;
+        }
+      });
       drag.cluster.style.cursor = 'grab';
       drag = null;
     };
