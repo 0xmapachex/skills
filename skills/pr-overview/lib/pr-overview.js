@@ -493,12 +493,14 @@
 
     // Subgraph cluster titles ("UI surfaces", "Services", etc.) render at
     // exactly the rect top, so the dashed border passes through the text.
-    // Shift each .cluster-label wrapper down so it sits a comfortable
-    // ~14px inside the box.
+    // Float them ABOVE the box (negative y) so the title acts like a small
+    // caption sitting above the dashed border, with a clear gap. Shifting
+    // them DOWN would push the title into a node when the subgraph only
+    // has one node directly under it.
     svgEl.querySelectorAll('g.cluster-label').forEach((g) => {
       if (g.dataset.prShifted) return;
       const cur = g.getAttribute('transform') || '';
-      g.setAttribute('transform', cur + ' translate(0,16)');
+      g.setAttribute('transform', cur + ' translate(0,-12)');
       g.dataset.prShifted = '1';
     });
 
