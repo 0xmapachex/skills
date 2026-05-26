@@ -45,3 +45,15 @@ test('renders theme toggle button', () => {
   const html = renderToString(FIXTURE);
   assert.ok(html.includes('data-theme-toggle'), 'theme toggle missing');
 });
+
+test('JS source wires panzoom and detail panel', () => {
+  const html = renderToString(FIXTURE);
+  assert.ok(html.includes('panzoom('), 'panzoom() init call missing');
+  assert.ok(html.includes('data-detail-panel'), 'detail panel selector missing');
+  assert.ok(html.includes('localStorage.setItem'), 'theme persistence missing');
+});
+
+test('JS source includes copy-to-clipboard for file chips', () => {
+  const html = renderToString(FIXTURE);
+  assert.ok(html.includes('navigator.clipboard'), 'clipboard wiring missing');
+});
