@@ -296,9 +296,41 @@
       `;
     }
   }
-  function renderCodeObservations(host, c){ /* Task 12 */ host.appendChild(el('div', {}, 'code_observations')); }
-  function renderRiskRollout(host, r)     { /* Task 12 */ host.appendChild(el('div', {}, 'risk_rollout')); }
-  function renderOpenQuestions(host, o)   { /* Task 12 */ host.appendChild(el('div', {}, 'open_questions')); }
+  function renderCodeObservations(host, c) {
+    c.items.forEach((it) => {
+      host.appendChild(el('div', { class: 'prose-card' }, [
+        el('div', { class: 'prose-card__title' }, [
+          el('span', {}, it.title),
+          el('span', { class: 'kind-chip' }, it.kind),
+        ]),
+        it.note ? el('p', { class: 'prose-card__body' }, it.note) : null,
+        (it.files?.length)
+          ? el('div', { class: 'prose-card__files', html: it.files.map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ') })
+          : null,
+      ]));
+    });
+  }
+
+  function renderRiskRollout(host, r) {
+    r.items.forEach((it) => {
+      host.appendChild(el('div', { class: 'prose-card' }, [
+        el('div', { class: 'prose-card__title' }, [
+          el('span', {}, it.title),
+          el('span', { class: 'kind-chip' }, it.severity),
+        ]),
+        el('p', { class: 'prose-card__body' }, it.notes),
+        (it.files?.length)
+          ? el('div', { class: 'prose-card__files', html: it.files.map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ') })
+          : null,
+      ]));
+    });
+  }
+
+  function renderOpenQuestions(host, o) {
+    const ul = el('ul', { class: 'summary-bullets' });
+    o.items.forEach((q) => ul.appendChild(el('li', {}, q)));
+    host.appendChild(ul);
+  }
 
   function layoutGrid(nodes, edges) {
     // Topological-ish: sources on the left, sinks on the right. 240x180 cells.
