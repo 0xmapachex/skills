@@ -532,15 +532,11 @@ details.spec summary .dot {
   padding: 0 !important;
   border-radius: 0;
 }
-/* Mermaid wraps edge labels in a <foreignObject> with a child .labelBkg
-   rect — kill its fill too so no block appears behind the text. */
-.mmd-inner svg .edgeLabel .labelBkg,
-.mmd-inner svg .edgeLabel rect.labelBkg,
-.mmd-inner svg rect.edgeLabel,
-.mmd-inner svg .edgePath .edgeLabel rect {
+/* Kill ONLY the rect Mermaid paints behind each edge label.
+   Do not touch the text container — that hides the label itself. */
+.mmd-inner svg .labelBkg,
+.mmd-inner svg .edgeLabel rect.labelBkg {
   fill: transparent !important;
-  background: transparent !important;
-  opacity: 0 !important;
 }
 .mmd-inner svg .node[id*="n_"] rect,
 .mmd-inner svg .node[id*="n_"] polygon {
