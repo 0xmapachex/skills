@@ -500,7 +500,7 @@
     svgEl.querySelectorAll('g.cluster-label').forEach((g) => {
       if (g.dataset.prShifted) return;
       const cur = g.getAttribute('transform') || '';
-      g.setAttribute('transform', cur + ' translate(0,-12)');
+      g.setAttribute('transform', cur + ' translate(0,-15)');
       g.dataset.prShifted = '1';
     });
 
