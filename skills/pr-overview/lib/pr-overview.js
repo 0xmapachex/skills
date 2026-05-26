@@ -491,6 +491,17 @@
     svgEl.style.maxWidth = 'none';
     svgEl.style.display = 'block';
 
+    // Subgraph cluster titles ("UI surfaces", "Services", etc.) render at
+    // exactly the rect top, so the dashed border passes through the text.
+    // Shift each .cluster-label wrapper down so it sits a comfortable
+    // ~14px inside the box.
+    svgEl.querySelectorAll('g.cluster-label').forEach((g) => {
+      if (g.dataset.prShifted) return;
+      const cur = g.getAttribute('transform') || '';
+      g.setAttribute('transform', cur + ' translate(0,16)');
+      g.dataset.prShifted = '1';
+    });
+
     // Lift each edge label above its line by translating the wrapper <g>.
     // Do NOT add per-text dy — Mermaid puts each word on its own <text>
     // sibling, so per-element dy would stack them into a staircase.
