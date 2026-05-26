@@ -4,6 +4,10 @@
   const data = window.__PR_OVERVIEW_DATA__;
   if (!data) return;
 
+  // Cross-renderer namespace. Initialised early so theme-toggle and section
+  // renderers can register hooks before the first render finishes.
+  window.__pro = window.__pro || { themeChangeHandlers: [] };
+
   // ---------- helpers ----------
   const pick = (obj, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), obj);
   const el = (tag, attrs = {}, children = []) => {
@@ -50,6 +54,10 @@
     const next = root.getAttribute('data-theme') === 'paper' ? 'dark' : 'paper';
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('pr-overview.theme', next); } catch (_) {}
+    // Mermaid bakes its theme variables + classDefs into the rendered SVG, so
+    // a toggle has to re-render the diagram. The architecture renderer
+    // registers a callback here for that purpose.
+    (window.__pro.themeChangeHandlers || []).forEach((fn) => { try { fn(next); } catch (_) {} });
   });
 
   // ---------- hero + footer ----------
@@ -301,11 +309,19 @@
     const detailKey = id;
     window.__archDetail[detailKey] = null; // placeholder; per-node entries set below
 
-    mmdHost.textContent = buildMermaid(a, detailKey);
+    const renderOnce = () => {
+      // textContent reset + clear the data-processed flag so Mermaid will
+      // re-render this element on subsequent runs (it skips already-processed
+      // nodes otherwise).
+      mmdHost.textContent = buildMermaid(a, detailKey);
+      mmdHost.removeAttribute('data-processed');
+      runMermaid(mmdHost, () => wireMermaidInteractions(mmdHost, a, inner));
+    };
+    renderOnce();
 
-    // Mermaid v11 is available as `window.mermaid`. We initialise it once
-    // with theme variables matching the active palette, then render this graph.
-    runMermaid(mmdHost, () => wireMermaidInteractions(mmdHost, a, inner));
+    // Re-render on theme toggle: classDef colors and theme variables are baked
+    // into the rendered SVG, so a toggle has to rebuild from source.
+    window.__pro.themeChangeHandlers.push(renderOnce);
   }
 
   function buildMermaid(a, detailKey) {
@@ -1060,5 +1076,5 @@
     svgEl.appendChild(path);
   }
 
-  window.__pro = { el, escapeHTML, openDetail, closeDetail };
+  Object.assign(window.__pro, { el, escapeHTML, openDetail, closeDetail });
 })();
