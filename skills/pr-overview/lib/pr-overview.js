@@ -418,8 +418,10 @@
           lineColor: '#5b5347',
           secondaryColor: '#f0e6cf',
           tertiaryColor: '#e3ece6',
-          clusterBkg: '#f3efe6',
-          clusterBorder: '#ddd4bf',
+          // Cluster contrast: pale fill vs ink-soft border so subgraph groups
+          // read clearly without competing with the node colors.
+          clusterBkg: 'rgba(0,0,0,0.045)',
+          clusterBorder: '#5b5347',
           edgeLabelBackground: '#fbf9f3',
         } : {
           fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',
@@ -430,8 +432,8 @@
           lineColor: '#c9d1d9',
           secondaryColor: '#21262d',
           tertiaryColor: 'rgba(63,185,80,0.15)',
-          clusterBkg: '#0e1116',
-          clusterBorder: '#30363d',
+          clusterBkg: 'rgba(255,255,255,0.04)',
+          clusterBorder: '#8b949e',
           edgeLabelBackground: '#161b22',
         },
       });
@@ -672,13 +674,15 @@
 
   function renderDatabase(host, d) {
     host.appendChild(el('p', {}, [
-      el('span', {}, 'Tables and columns this branch adds, changes, or removes. Field rows are color-coded — green rows are new, blue are modified — and amber strips mark privacy-sensitive fields. '),
-      el('strong', {}, 'Click any table '),
+      el('span', {}, 'Tables and columns this branch adds, changes, or removes. Field rows are color-coded — green rows are new, blue are modified — amber strips mark privacy-sensitive fields. '),
+      el('strong', {}, 'Drag any table '),
+      el('span', {}, 'to reposition it (relations re-route live), or '),
+      el('strong', {}, 'click '),
       el('span', {}, 'for its full field list and write/read paths.'),
     ]));
 
-    const wrap = mountCanvas(host);
-    wrap.canvas.appendChild(el('div', { class: 'canvas__hint' }, 'hover to focus · ctrl + wheel to zoom · drag empty canvas to pan'));
+    const wrap = mountCanvas(host, { allowCardDrag: true });
+    wrap.canvas.appendChild(el('div', { class: 'canvas__hint' }, 'drag tables · hover to focus · ctrl + wheel to zoom'));
 
     const byId = new Map();
     const links = (d.relations || []).map((r) => ({
@@ -689,7 +693,7 @@
 
     d.tables.forEach((t) => {
       const card = el('div', {
-        class: `node is-${t.status}`,
+        class: `node node--draggable is-${t.status}`,
         style: 'min-width:260px;',
       }, [
         el('div', { class: 'node__head' }, [
@@ -726,6 +730,7 @@
         nodes: d.tables, links,
         drawLink: drawRelationEdge,
       });
+      wireDrag(wrap, byId, links, drawRelationEdge);
       if (wrap.pz) fitToContent(wrap.pz, wrap.scene, wrap.canvas);
     });
 
@@ -797,7 +802,7 @@
   // Canvas / panzoom / layout
   // ============================================================
 
-  function mountCanvas(parent) {
+  function mountCanvas(parent, opts = {}) {
     const canvas = el('div', { class: 'canvas' });
     const scene  = el('div', { class: 'canvas__scene' });
     const edges  = svg('svg', { class: 'canvas__edges' });
@@ -817,6 +822,12 @@
       pz = window.panzoom(scene, {
         smoothScroll: false,
         beforeWheel: (e) => !e.ctrlKey && !e.metaKey,
+        // When card-drag is enabled for this canvas, panzoom must yield to
+        // the card's own mousedown handler — otherwise the canvas pans
+        // instead of the card moving.
+        beforeMouseDown: opts.allowCardDrag
+          ? (e) => !!e.target.closest?.('.node--draggable')
+          : undefined,
       });
     }
     controls.addEventListener('click', (e) => {
@@ -956,6 +967,68 @@
     cards.forEach((c) => c.addEventListener('mouseenter', () => focus(c.getAttribute('data-detail-source'))));
     const cv = scene.parentElement;
     if (cv) cv.addEventListener('mouseleave', clear);
+  }
+
+  // Wire drag-to-reposition on every .node--draggable card. Edges re-route
+  // live during the drag; the scene grows to fit when a card is moved past
+  // the current bounds.
+  function wireDrag(wrap, byId, links, drawLink) {
+    const scene = wrap.scene;
+    const edges = wrap.edges;
+    const cards = Array.from(scene.querySelectorAll('.node--draggable'));
+    let drag = null;
+    cards.forEach((card) => {
+      card.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const sceneRect = scene.getBoundingClientRect();
+        const scale = sceneRect.width / scene.offsetWidth || 1;
+        drag = {
+          card,
+          startX: e.clientX, startY: e.clientY,
+          origLeft: parseFloat(card.style.left || 0),
+          origTop:  parseFloat(card.style.top  || 0),
+          scale,
+        };
+        card.classList.add('is-dragging');
+      });
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!drag) return;
+      const dx = (e.clientX - drag.startX) / drag.scale;
+      const dy = (e.clientY - drag.startY) / drag.scale;
+      drag.card.style.left = (drag.origLeft + dx) + 'px';
+      drag.card.style.top  = (drag.origTop  + dy) + 'px';
+      redrawEdges(edges, byId, links, drawLink);
+      scene.appendChild(edges);
+    });
+    document.addEventListener('mouseup', () => {
+      if (!drag) return;
+      drag.card.classList.remove('is-dragging');
+      growSceneToFit(scene, edges);
+      redrawEdges(edges, byId, links, drawLink);
+      scene.appendChild(edges);
+      drag = null;
+    });
+  }
+
+  function growSceneToFit(scene, edges) {
+    let maxRight = 0, maxBottom = 0;
+    Array.from(scene.children).forEach((c) => {
+      if (!c.classList?.contains('node')) return;
+      const right  = parseFloat(c.style.left || 0) + c.offsetWidth;
+      const bottom = parseFloat(c.style.top  || 0) + c.offsetHeight;
+      if (right > maxRight)   maxRight = right;
+      if (bottom > maxBottom) maxBottom = bottom;
+    });
+    const w = Math.max(scene.offsetWidth, maxRight + 60);
+    const h = Math.max(scene.offsetHeight, maxBottom + 60);
+    scene.style.width  = w + 'px';
+    scene.style.height = h + 'px';
+    edges.setAttribute('width',  w);
+    edges.setAttribute('height', h);
+    edges.setAttribute('viewBox', `0 0 ${w} ${h}`);
   }
 
   // ---------- arrow def + edge drawers ----------
