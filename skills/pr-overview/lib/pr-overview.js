@@ -308,6 +308,9 @@
   }
 
   function drawRelations(relations, byId, svg) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute('viewBox', `0 0 4000 4000`);
+    svg.setAttribute('width', '4000'); svg.setAttribute('height', '4000');
     relations.forEach((r) => {
       const fromTable = r.from.split('.')[0];
       const toTable   = r.to.split('.')[0];
