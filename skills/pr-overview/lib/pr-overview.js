@@ -422,7 +422,7 @@
           // read clearly without competing with the node colors.
           clusterBkg: 'rgba(0,0,0,0.045)',
           clusterBorder: '#5b5347',
-          edgeLabelBackground: '#fbf9f3',
+          edgeLabelBackground: 'transparent',
         } : {
           fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',
           background: '#161b22',
@@ -434,7 +434,7 @@
           tertiaryColor: 'rgba(63,185,80,0.15)',
           clusterBkg: 'rgba(255,255,255,0.04)',
           clusterBorder: '#8b949e',
-          edgeLabelBackground: '#161b22',
+          edgeLabelBackground: 'transparent',
         },
       });
       window.mermaid.run({ nodes: [mmdHost] }).then(afterRender);

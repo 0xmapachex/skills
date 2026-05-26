@@ -528,9 +528,19 @@ details.spec summary .dot {
 .mmd-inner svg .edgeLabel {
   font-family: var(--mono) !important;
   font-size: 11.5px !important;
-  background: var(--surface) !important;
-  padding: 2px 6px !important;
-  border-radius: 4px;
+  background: transparent !important;
+  padding: 0 !important;
+  border-radius: 0;
+}
+/* Mermaid wraps edge labels in a <foreignObject> with a child .labelBkg
+   rect — kill its fill too so no block appears behind the text. */
+.mmd-inner svg .edgeLabel .labelBkg,
+.mmd-inner svg .edgeLabel rect.labelBkg,
+.mmd-inner svg rect.edgeLabel,
+.mmd-inner svg .edgePath .edgeLabel rect {
+  fill: transparent !important;
+  background: transparent !important;
+  opacity: 0 !important;
 }
 .mmd-inner svg .node[id*="n_"] rect,
 .mmd-inner svg .node[id*="n_"] polygon {
@@ -1354,7 +1364,7 @@ div.node--draggable.is-dragging { cursor: grabbing; }
           // read clearly without competing with the node colors.
           clusterBkg: 'rgba(0,0,0,0.045)',
           clusterBorder: '#5b5347',
-          edgeLabelBackground: '#fbf9f3',
+          edgeLabelBackground: 'transparent',
         } : {
           fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',
           background: '#161b22',
@@ -1366,7 +1376,7 @@ div.node--draggable.is-dragging { cursor: grabbing; }
           tertiaryColor: 'rgba(63,185,80,0.15)',
           clusterBkg: 'rgba(255,255,255,0.04)',
           clusterBorder: '#8b949e',
-          edgeLabelBackground: '#161b22',
+          edgeLabelBackground: 'transparent',
         },
       });
       window.mermaid.run({ nodes: [mmdHost] }).then(afterRender);
