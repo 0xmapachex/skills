@@ -259,6 +259,25 @@
       el('span', {}, 'to see its responsibilities, files, and status. The diagram is laid out automatically — use the controls at the bottom right to zoom or fit.'),
     ]));
 
+    // Inline color legend so the reviewer doesn't need to remember the codes.
+    const legend = el('div', { class: 'arch-legend' }, [
+      el('span', { class: 'arch-legend__label' }, 'Legend'),
+      el('span', { class: 'arch-legend__item' }, [
+        el('span', { class: 'arch-legend__chip arch-legend__chip--added' }),
+        el('span', {}, 'added'),
+      ]),
+      el('span', { class: 'arch-legend__item' }, [
+        el('span', { class: 'arch-legend__chip arch-legend__chip--changed' }),
+        el('span', {}, 'changed'),
+      ]),
+      el('span', { class: 'arch-legend__item' }, [
+        el('span', { class: 'arch-legend__chip arch-legend__chip--context' }),
+        el('span', {}, 'context (unchanged)'),
+      ]),
+      el('span', { class: 'arch-legend__edges' }, 'Edges: solid = sync · dashed = async/data'),
+    ]);
+    host.appendChild(legend);
+
     const id = 'arch-mmd-' + Math.random().toString(36).slice(2, 9);
     const wrap = el('div', { class: 'mmd-wrap' });
     const inner = el('div', { class: 'mmd-inner' });
@@ -335,11 +354,21 @@
       lines.push(`  ${sid(e.from)} ${arrow}${label}${close}${sid(e.to)}`);
     });
 
-    // Status colors via classDef.
-    lines.push('  classDef added   fill:#e3ece6,stroke:#15604c,stroke-width:2px,color:#0d4234');
-    lines.push('  classDef changed fill:#e1e8f3,stroke:#355b94,stroke-width:2px,color:#1c3a6b');
-    lines.push('  classDef removed fill:#f0e0d6,stroke:#a4452c,stroke-width:2px,color:#5a2510,stroke-dasharray:5 5');
-    lines.push('  classDef context fill:#fbf9f3,stroke:#ddd4bf,color:#5b5347');
+    // Status colors via classDef. Boosted contrast so the difference between
+    // added / changed / context is obvious at a glance — thin pale tints
+    // turned out to be unreadable for reviewers scanning the diagram.
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (dark) {
+      lines.push('  classDef added   fill:#1f4f3a,stroke:#3fb950,stroke-width:3px,color:#c8f0d2,font-weight:bold');
+      lines.push('  classDef changed fill:#1f3a5a,stroke:#58a6ff,stroke-width:3px,color:#cfdbed,font-weight:bold');
+      lines.push('  classDef removed fill:#4a2520,stroke:#f85149,stroke-width:3px,color:#f5c6c1,font-weight:bold,stroke-dasharray:5 5');
+      lines.push('  classDef context fill:#21262d,stroke:#8b949e,stroke-width:2px,color:#c9d1d9,stroke-dasharray:4 4');
+    } else {
+      lines.push('  classDef added   fill:#b3d4c4,stroke:#0d4234,stroke-width:3px,color:#0d4234,font-weight:bold');
+      lines.push('  classDef changed fill:#b8c8e1,stroke:#1c3a6b,stroke-width:3px,color:#1c3a6b,font-weight:bold');
+      lines.push('  classDef removed fill:#e6b8a3,stroke:#5a2510,stroke-width:3px,color:#5a2510,font-weight:bold,stroke-dasharray:5 5');
+      lines.push('  classDef context fill:#ece5d5,stroke:#5b5347,stroke-width:2px,color:#211e19,stroke-dasharray:4 4');
+    }
 
     a.nodes.forEach((n) => {
       const status = a.details?.[n.id]?.status ?? (n.changed ? 'changed' : 'context');
