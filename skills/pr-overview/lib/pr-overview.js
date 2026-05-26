@@ -164,12 +164,96 @@
     s.bullets.forEach((b) => ul.appendChild(el('li', {}, b)));
     host.appendChild(ul);
   }
-  function renderArchitecture(host, a)   { /* Task 9 */ host.appendChild(el('div', {}, 'architecture')); }
+  function renderArchitecture(host, a) {
+    const { canvas, scene, edges } = mountCanvas(host);
+
+    // Lay nodes out in a simple grid based on incoming edges. Good enough for v1.
+    const positions = layoutGrid(a.nodes, a.edges);
+    const byId = new Map();
+
+    a.nodes.forEach((n) => {
+      const status = a.details?.[n.id]?.status ?? (n.changed ? 'changed' : 'context');
+      const card = el('div', { class: 'node' + ' is-' + status, style: `left:${positions[n.id].x}px; top:${positions[n.id].y}px` }, [
+        el('div', { class: 'node__head' }, [
+          el('span', { class: 'node__kind' }, kindIcon(n.kind)),
+          el('span', {}, n.label),
+          status !== 'context' ? el('span', { class: `status-chip is-${status}` }, statusChipText(status)) : null,
+        ]),
+        renderNodeBody(a.details?.[n.id]),
+      ]);
+      card.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openDetail(detailHTML(n, a.details?.[n.id]));
+      });
+      card.setAttribute('data-detail-source', n.id);
+      scene.appendChild(card);
+      byId.set(n.id, card);
+    });
+
+    // Draw edges as SVG paths after layout settles.
+    requestAnimationFrame(() => drawEdges(a.edges, byId, edges));
+
+    function kindIcon(k) {
+      return ({ service: 'svc', module: 'mod', datastore: 'db', external: 'ext', ui: 'ui', job: 'job' })[k] || k;
+    }
+    function statusChipText(s) { return ({ 'is-added': '+ added', 'is-changed': '~ changed', 'is-removed': '− removed' })['is-' + s]; }
+    function renderNodeBody(details) {
+      if (!details?.responsibilities?.length) return el('div');
+      return el('div', { class: 'node__body' }, [
+        el('ul', {}, details.responsibilities.slice(0, 4).map((r) => el('li', {}, r))),
+      ]);
+    }
+    function detailHTML(n, d) {
+      const files = (d?.files ?? []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
+      const resp = (d?.responsibilities ?? []).map((r) => `<li>${escapeHTML(r)}</li>`).join('');
+      return `
+        <h3>${escapeHTML(n.label)}</h3>
+        <p><span class="kind-chip">${escapeHTML(n.kind)}</span></p>
+        ${d?.summary ? `<p>${escapeHTML(d.summary)}</p>` : ''}
+        ${resp ? `<h4>Responsibilities</h4><ul>${resp}</ul>` : ''}
+        ${files ? `<h4>Files</h4><div class="prose-card__files">${files}</div>` : ''}
+      `;
+    }
+  }
   function renderFlow(host, f)            { /* Task 11 */ host.appendChild(el('div', {}, 'flow')); }
   function renderDatabase(host, d)        { /* Task 10 */ host.appendChild(el('div', {}, 'database')); }
   function renderCodeObservations(host, c){ /* Task 12 */ host.appendChild(el('div', {}, 'code_observations')); }
   function renderRiskRollout(host, r)     { /* Task 12 */ host.appendChild(el('div', {}, 'risk_rollout')); }
   function renderOpenQuestions(host, o)   { /* Task 12 */ host.appendChild(el('div', {}, 'open_questions')); }
+
+  function layoutGrid(nodes, edges) {
+    // Topological-ish: sources on the left, sinks on the right. 240x180 cells.
+    const incoming = new Map(nodes.map((n) => [n.id, 0]));
+    for (const e of edges) incoming.set(e.to, (incoming.get(e.to) || 0) + 1);
+    const sorted = [...nodes].sort((a, b) => (incoming.get(a.id) - incoming.get(b.id)));
+    const colHeight = Math.max(2, Math.ceil(Math.sqrt(sorted.length)));
+    const pos = {};
+    sorted.forEach((n, i) => {
+      const col = Math.floor(i / colHeight);
+      const row = i % colHeight;
+      pos[n.id] = { x: 40 + col * 320, y: 40 + row * 180 };
+    });
+    return pos;
+  }
+
+  function drawEdges(edges, byId, svg) {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    svg.setAttribute('viewBox', `0 0 4000 4000`);
+    svg.setAttribute('width', '4000'); svg.setAttribute('height', '4000');
+    edges.forEach((e) => {
+      const fromCard = byId.get(e.from); const toCard = byId.get(e.to);
+      if (!fromCard || !toCard) return;
+      const fx = parseFloat(fromCard.style.left) + fromCard.offsetWidth;
+      const fy = parseFloat(fromCard.style.top)  + fromCard.offsetHeight / 2;
+      const tx = parseFloat(toCard.style.left);
+      const ty = parseFloat(toCard.style.top)    + toCard.offsetHeight / 2;
+      const cx = (fx + tx) / 2;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M ${fx} ${fy} C ${cx} ${fy}, ${cx} ${ty}, ${tx} ${ty}`);
+      if (e.kind === 'async') path.classList.add('is-async');
+      svg.appendChild(path);
+    });
+  }
 
   // ---------- shared helpers exposed for renderers ----------
   window.__pro = { el, escapeHTML, mountCanvas, openDetail, closeDetail };
