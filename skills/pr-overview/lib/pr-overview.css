@@ -506,9 +506,8 @@ details.spec summary .dot {
   padding: 2px 6px !important;
   border-radius: 4px;
 }
-.mmd-inner svg .node[id*="n_"]:hover rect,
-.mmd-inner svg .node[id*="n_"]:hover polygon {
-  filter: brightness(1.05);
+.mmd-inner svg .node[id*="n_"] rect,
+.mmd-inner svg .node[id*="n_"] polygon {
   cursor: pointer;
 }
 .mmd-hint {
