@@ -591,8 +591,13 @@ details.spec summary .dot {
   stroke: var(--surface); stroke-width: 4px;
 }
 
-/* ---------- UML / ER cards ---------- */
-.node {
+/* ---------- UML / ER cards ----------
+   Selector scoped to div.node so it doesn't collide with Mermaid's
+   <g class="node"> elements in the architecture diagram, which already
+   carry a `transform="translate(X,Y)"` attribute. A bare .node:hover
+   transform would stack on top and produce jitter as the user mouses
+   over Mermaid boxes. */
+div.node {
   position: absolute;
   min-width: 220px; max-width: 320px;
   background: var(--surface);
@@ -602,12 +607,12 @@ details.spec summary .dot {
   font-family: var(--mono);
   box-shadow: var(--shadow);
 }
-.node:hover {
+div.node:hover {
   transform: translateY(-2px);
   border-color: var(--accent);
   box-shadow: var(--shadow-lift);
 }
-.node.is-dimmed { opacity: 0.3; transition: opacity .12s ease; }
+div.node.is-dimmed { opacity: 0.3; transition: opacity .12s ease; }
 .node__head {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px;
