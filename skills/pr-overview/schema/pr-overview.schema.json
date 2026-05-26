@@ -21,15 +21,46 @@
     },
     "summary": {
       "type": "object",
-      "required": ["bullets"],
+      "required": ["tldr", "ships"],
       "properties": {
-        "bullets": { "type": "array", "minItems": 1, "maxItems": 7, "items": { "type": "string" } }
+        "tldr":    { "type": "string", "maxLength": 360 },
+        "ships":   { "type": "array", "minItems": 1, "maxItems": 6, "items": { "type": "string" } },
+        "why":     { "type": "string", "maxLength": 260 },
+        "changes": { "type": "array", "maxItems": 6, "items": { "type": "string" } },
+        "topics": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "required": ["title", "summary"],
+            "properties": {
+              "title":      { "type": "string" },
+              "summary":    { "type": "string" },
+              "body":       { "type": "string" },
+              "highlights": { "type": "array", "items": { "type": "string" }, "maxItems": 5 },
+              "code": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["body"],
+                  "properties": {
+                    "lang": { "type": "string" },
+                    "file": { "type": "string" },
+                    "body": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "architecture": {
       "type": "object",
       "required": ["nodes", "edges"],
       "properties": {
+        "summary":    { "type": "string" },
+        "highlights": { "type": "array", "items": { "type": "string" }, "maxItems": 5 },
         "nodes": {
           "type": "array",
           "items": {
@@ -74,8 +105,9 @@
       "type": "object",
       "required": ["actors", "steps"],
       "properties": {
-        "title":   { "type": "string" },
-        "summary": { "type": "string" },
+        "title":      { "type": "string" },
+        "summary":    { "type": "string" },
+        "highlights": { "type": "array", "items": { "type": "string" }, "maxItems": 5 },
         "actors": {
           "type": "array",
           "items": {
@@ -113,6 +145,8 @@
       "type": "object",
       "required": ["tables"],
       "properties": {
+        "summary":    { "type": "string" },
+        "highlights": { "type": "array", "items": { "type": "string" }, "maxItems": 5 },
         "tables": {
           "type": "array",
           "items": {
@@ -151,26 +185,6 @@
               "from":   { "type": "string" },
               "to":     { "type": "string" },
               "status": { "enum": ["added", "changed", "removed", "context"] }
-            }
-          }
-        }
-      }
-    },
-    "code_observations": {
-      "type": "object",
-      "required": ["items"],
-      "properties": {
-        "items": {
-          "type": "array",
-          "maxItems": 5,
-          "items": {
-            "type": "object",
-            "required": ["title", "kind"],
-            "properties": {
-              "title": { "type": "string" },
-              "kind":  { "enum": ["pattern", "risky-spot", "suggestion"] },
-              "files": { "type": "array", "items": { "type": "string" } },
-              "note":  { "type": "string" }
             }
           }
         }

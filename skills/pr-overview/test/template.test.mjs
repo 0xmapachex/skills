@@ -31,7 +31,7 @@ test('renders required section anchors', () => {
 
 test('does NOT render optional section anchors when absent', () => {
   const html = renderToString(FIXTURE);
-  for (const anchor of ['section-flow', 'section-database', 'section-code-observations', 'section-risk-rollout']) {
+  for (const anchor of ['section-flow', 'section-database', 'section-risk-rollout']) {
     assert.ok(!html.includes(`id="${anchor}"`), `unexpected anchor #${anchor} when omitted`);
   }
 });

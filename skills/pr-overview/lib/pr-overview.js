@@ -27,6 +27,21 @@
   const escapeHTML = (s) => String(s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
+  // Append a string to a host node, expanding any backtick-wrapped spans
+  // (`foo`) into <code>foo</code> nodes. Used by structured framing fields
+  // (architecture.summary, flow.summary, *.highlights) so code identifiers
+  // get the mono-font code styling without us needing markdown anywhere.
+  const appendInlineCode = (host, text) => {
+    const s = String(text);
+    const re = /`([^`]+)`/g;
+    let last = 0, m;
+    while ((m = re.exec(s)) !== null) {
+      if (m.index > last) host.appendChild(document.createTextNode(s.slice(last, m.index)));
+      host.appendChild(el('code', {}, m[1]));
+      last = re.lastIndex;
+    }
+    if (last < s.length) host.appendChild(document.createTextNode(s.slice(last)));
+  };
   const svg = (tag, attrs = {}) => {
     const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
     for (const [k, v] of Object.entries(attrs)) {
@@ -63,14 +78,15 @@
   // ---------- hero + footer ----------
   const heroTitle = document.querySelector('[data-hero-title]');
   if (heroTitle) heroTitle.textContent = data.meta.title;
+  // Hero subhead + footer stand-fill both pull from the new TL;DR. Fall back
+  // to first ship item if no tldr (defensive — schema requires tldr).
   const heroStand = document.querySelector('[data-hero-stand]');
-  if (heroStand && data.summary?.bullets?.length) {
-    heroStand.textContent = data.summary.bullets[0];
+  if (heroStand) {
+    heroStand.textContent = data.summary?.tldr || data.summary?.ships?.[0] || '';
   }
   const footerStand = document.querySelector('[data-footer-stand]');
-  if (footerStand && data.summary?.bullets?.length) {
-    const tail = data.summary.bullets.slice(0, 2).join(' ');
-    footerStand.textContent = tail;
+  if (footerStand) {
+    footerStand.textContent = data.summary?.tldr || data.summary?.ships?.[0] || '';
   }
   const prLink = document.querySelector('[data-footer-link]');
   if (prLink) {
@@ -105,7 +121,6 @@
     architecture:      { label: 'The big picture',  render: renderArchitecture },
     flow:              { label: 'How it flows',     render: renderFlow },
     database:          { label: 'Database changes', render: renderDatabase },
-    code_observations: { label: 'Caught in review', render: renderCodeObservations },
     risk_rollout:      { label: 'Risk & rollout',   render: renderRiskRollout },
     open_questions:    { label: 'Open questions',   render: renderOpenQuestions },
   };
@@ -116,7 +131,6 @@
     architecture:      'section-architecture',
     flow:              'section-flow',
     database:          'section-database',
-    code_observations: 'section-code-observations',
     risk_rollout:      'section-risk-rollout',
     open_questions:    'section-open-questions',
   };
@@ -130,7 +144,7 @@
     // sees one shape.
     const payload = key === 'flow' ? (data.flow || data.flows) : data[key];
     if (!payload) return;
-    if (key === 'summary' && !data.summary?.bullets?.length) return;
+    if (key === 'summary' && !data.summary?.tldr) return;
     n += 1;
     const anchor = ANCHORS[key];
     const meta = RENDERERS[key];
@@ -216,11 +230,16 @@
   // ============================================================
 
   function renderWhy(host, summary) {
-    const lead = el('p', { class: 'lead' });
-    lead.textContent = data.meta.title + ' — at a glance.';
-    host.appendChild(lead);
+    // TL;DR — the executive lede the reviewer reads first.
+    if (summary.tldr) {
+      const p = el('p', { class: 'why__tldr' });
+      p.appendChild(el('strong', { class: 'why__tldr-tag' }, 'TL;DR.'));
+      p.appendChild(document.createTextNode(' '));
+      appendInlineCode(p, summary.tldr);
+      host.appendChild(p);
+    }
 
-    // meta strip with file/insertion/deletion counts + type tags.
+    // Diff stats + tags.
     const strip = el('div', { class: 'meta-strip' }, [
       el('span', { class: 'chip' }, [el('span', {}, 'base · '), el('b', {}, data.meta.base)]),
       el('span', { class: 'chip' }, [el('span', {}, '→ '), el('b', {}, data.meta.head)]),
@@ -231,33 +250,90 @@
     ]);
     host.appendChild(strip);
 
-    // Each summary bullet becomes a "gap card".
-    const gaps = el('div', { class: 'gaps' });
-    const icons = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
-    summary.bullets.forEach((b, i) => {
-      const sentence = String(b).trim();
-      // Use the first noun phrase as the heading, rest as body. Simple split on " — " or first sentence end.
-      let title = sentence, body = '';
-      const dashIdx = sentence.search(/[——:]\s/);
-      if (dashIdx > 0 && dashIdx < 80) {
-        title = sentence.slice(0, dashIdx).trim();
-        body = sentence.slice(dashIdx + 2).trim();
-      } else if (sentence.length > 100) {
-        const periodIdx = sentence.indexOf('. ');
-        if (periodIdx > 0 && periodIdx < 90) {
-          title = sentence.slice(0, periodIdx).trim();
-          body = sentence.slice(periodIdx + 2).trim();
-        }
-      }
-      gaps.appendChild(el('div', { class: 'gap' }, [
-        el('div', { class: 'gap__ic' }, icons[i] || String(i + 1)),
-        el('div', {}, [
-          el('h3', {}, title),
-          body ? el('p', {}, body) : null,
-        ]),
-      ]));
-    });
-    host.appendChild(gaps);
+    // Three lenses: what ships · why now · what changes.
+    const lenses = el('div', { class: 'why__lenses' });
+    if (Array.isArray(summary.ships) && summary.ships.length) {
+      lenses.appendChild(renderWhyLens('What ships', summary.ships, 'list'));
+    }
+    if (summary.why) {
+      lenses.appendChild(renderWhyLens('Why now', summary.why, 'prose'));
+    }
+    if (Array.isArray(summary.changes) && summary.changes.length) {
+      lenses.appendChild(renderWhyLens('What changes', summary.changes, 'list'));
+    }
+    host.appendChild(lenses);
+
+    // Expandable topics — for things that don't deserve a full diagram
+    // section (security invariants, key trade-offs, code worth seeing).
+    if (Array.isArray(summary.topics) && summary.topics.length) {
+      host.appendChild(el('h3', { class: 'why-topics__heading' }, 'Worth a closer look'));
+      const list = el('div', { class: 'why-topics' });
+      summary.topics.forEach((t) => list.appendChild(renderWhyTopic(t)));
+      host.appendChild(list);
+    }
+  }
+
+  function renderWhyLens(label, content, mode) {
+    const lens = el('section', { class: 'why__lens' });
+    lens.appendChild(el('h3', { class: 'why__eyebrow' }, label));
+    if (mode === 'prose') {
+      const p = el('p', { class: 'why__prose' });
+      appendInlineCode(p, content);
+      lens.appendChild(p);
+    } else {
+      const ul = el('ul', { class: 'why__list' });
+      content.forEach((item) => {
+        const li = el('li', {});
+        appendInlineCode(li, item);
+        ul.appendChild(li);
+      });
+      lens.appendChild(ul);
+    }
+    return lens;
+  }
+
+  function renderWhyTopic(t) {
+    const card    = el('details', { class: 'why-topic' });
+    const head    = el('summary', { class: 'why-topic__head' });
+    const title   = el('span', { class: 'why-topic__title' }, t.title || '');
+    head.appendChild(title);
+    if (t.summary) {
+      const lede = el('span', { class: 'why-topic__lede' });
+      appendInlineCode(lede, t.summary);
+      head.appendChild(lede);
+    }
+    card.appendChild(head);
+
+    const body = el('div', { class: 'why-topic__body' });
+    if (t.body) {
+      const p = el('p', { class: 'why-topic__prose' });
+      appendInlineCode(p, t.body);
+      body.appendChild(p);
+    }
+    if (Array.isArray(t.highlights) && t.highlights.length) {
+      const ul = el('ul', { class: 'why-topic__highlights' });
+      t.highlights.forEach((h) => {
+        const li = el('li', {});
+        appendInlineCode(li, h);
+        ul.appendChild(li);
+      });
+      body.appendChild(ul);
+    }
+    if (Array.isArray(t.code) && t.code.length) {
+      t.code.forEach((c) => {
+        const block = el('div', { class: 'why-topic__code' });
+        if (c.file) block.appendChild(el('div', { class: 'why-topic__code-head' }, [
+          el('span', { class: 'why-topic__code-file' }, c.file),
+          c.lang ? el('span', { class: 'why-topic__code-lang' }, c.lang) : null,
+        ]));
+        const pre = el('pre', { class: 'why-topic__code-body' });
+        pre.textContent = c.body || '';
+        block.appendChild(pre);
+        body.appendChild(block);
+      });
+    }
+    card.appendChild(body);
+    return card;
   }
 
   // Architecture is rendered via Mermaid flowchart. Subgraphs group nodes by
@@ -265,11 +341,20 @@
   // reads as a C4-style container view. Click handlers route to the detail
   // panel; status colors come from classDef.
   function renderArchitecture(host, a) {
-    host.appendChild(el('p', {}, [
-      el('span', {}, 'The components this branch touches, grouped by kind and connected by who calls whom. '),
-      el('strong', {}, 'Click any box '),
-      el('span', {}, 'to see its responsibilities, files, and status. The diagram is laid out automatically — use the controls at the bottom right to zoom or fit.'),
-    ]));
+    if (a.summary) {
+      const p = el('p', { class: 'arch-summary' });
+      appendInlineCode(p, a.summary);
+      host.appendChild(p);
+    }
+    if (Array.isArray(a.highlights) && a.highlights.length) {
+      const ul = el('ul', { class: 'arch-highlights' });
+      a.highlights.forEach((h) => {
+        const li = el('li', {});
+        appendInlineCode(li, h);
+        ul.appendChild(li);
+      });
+      host.appendChild(ul);
+    }
 
     // Inline color legend so the reviewer doesn't need to remember the codes.
     const legend = el('div', { class: 'arch-legend' }, [
@@ -859,7 +944,20 @@
       host.appendChild(el('h3', { class: 'flow-mmd__title' },
         (total > 1 ? `${idx + 1}. ` : '') + f.title));
     }
-    if (f.summary) host.appendChild(el('p', { class: 'flow-mmd__summary' }, f.summary));
+    if (f.summary) {
+      const p = el('p', { class: 'flow-mmd__summary' });
+      appendInlineCode(p, f.summary);
+      host.appendChild(p);
+    }
+    if (Array.isArray(f.highlights) && f.highlights.length) {
+      const ul = el('ul', { class: 'flow-mmd__highlights' });
+      f.highlights.forEach((h) => {
+        const li = el('li', {});
+        appendInlineCode(li, h);
+        ul.appendChild(li);
+      });
+      host.appendChild(ul);
+    }
 
     const id = 'flow-mmd-' + Math.random().toString(36).slice(2, 9);
     const wrap = el('div', { class: 'flow-mmd' });
@@ -1016,13 +1114,20 @@
   }
 
   function renderDatabase(host, d) {
-    host.appendChild(el('p', {}, [
-      el('span', {}, 'Tables and columns this branch adds, changes, or removes. Field rows are color-coded — green rows are new, blue are modified — amber strips mark privacy-sensitive fields. '),
-      el('strong', {}, 'Drag any table '),
-      el('span', {}, 'to reposition it (relations re-route live), or '),
-      el('strong', {}, 'click '),
-      el('span', {}, 'for its full field list and write/read paths.'),
-    ]));
+    if (d.summary) {
+      const p = el('p', { class: 'db-summary' });
+      appendInlineCode(p, d.summary);
+      host.appendChild(p);
+    }
+    if (Array.isArray(d.highlights) && d.highlights.length) {
+      const ul = el('ul', { class: 'db-highlights' });
+      d.highlights.forEach((h) => {
+        const li = el('li', {});
+        appendInlineCode(li, h);
+        ul.appendChild(li);
+      });
+      host.appendChild(ul);
+    }
 
     const wrap = mountCanvas(host, { allowCardDrag: true });
     wrap.canvas.appendChild(el('div', { class: 'canvas__hint' }, 'drag tables · hover to focus · ctrl + wheel to zoom'));
@@ -1093,27 +1198,8 @@
     }
   }
 
-  function renderCodeObservations(host, c) {
-    host.appendChild(el('p', {}, 'Light callouts the reviewer should see — not blocking, not severity-labelled. Use /review for a full audit.'));
-    c.items.forEach((it) => {
-      const filesHtml = (it.files || []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
-      const callout = el('div', { class: 'callout callout--review' }, [
-        el('span', { class: 'callout__ic' }, kindIcon(it.kind)),
-        el('div', { html:
-          `<b>${escapeHTML(it.title)}</b>` +
-          (it.note ? `<p>${escapeHTML(it.note)}</p>` : '') +
-          (filesHtml ? `<div class="spec__files">${filesHtml}</div>` : '')
-        }),
-      ]);
-      host.appendChild(callout);
-    });
-    function kindIcon(k) {
-      return ({ pattern: '◇', 'risky-spot': '⚠', suggestion: '★' })[k] || '·';
-    }
-  }
-
   function renderRiskRollout(host, r) {
-    host.appendChild(el('p', {}, 'Migration order, secret provisioning, deploy-order — the things that bite when shipped wrong.'));
+    // No generic intro — each risk is its own item.
     r.items.forEach((it) => {
       const filesHtml = (it.files || []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
       const callout = el('div', { class: 'callout' + (it.severity === 'careful' ? '' : ' callout--review') }, [
@@ -1132,7 +1218,7 @@
   }
 
   function renderOpenQuestions(host, o) {
-    host.appendChild(el('p', {}, 'Things the reviewer should resolve before approving. Each is a real question someone needs to answer.'));
+    // No generic intro — each open question is its own item.
     o.items.forEach((q) => {
       host.appendChild(el('div', { class: 'callout callout--question' }, [
         el('span', { class: 'callout__ic' }, '?'),
