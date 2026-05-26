@@ -1474,11 +1474,143 @@ div.node--draggable.is-dragging { cursor: grabbing; }
         smoothScroll: false,
         minZoom: 0.3, maxZoom: 4,
         beforeWheel: (e) => !e.ctrlKey && !e.metaKey,
-        beforeMouseDown: (e) => !!e.target.closest?.('.node'),
+        // Yield to clicks on nodes (open detail) and to drags on cluster
+        // chrome (move the whole subgraph).
+        beforeMouseDown: (e) =>
+          !!e.target.closest?.('.node') ||
+          !!e.target.closest?.('g.cluster'),
       });
       scrollWrap._pz = pz;
       requestAnimationFrame(() => fitMermaid(pz, svgEl, scrollWrap));
     }
+
+    // Wire drag on each cluster so reviewers can rearrange the layout.
+    wireClusterDrag(svgEl, a.edges);
+  }
+
+  // Make Mermaid g.cluster elements draggable. The cluster carries its
+  // label + rect + every nested node, all under one transform — so a
+  // single translate moves the whole subgraph as a unit. After each
+  // delta, we redraw the edges as straight orthogonal paths between
+  // the new node centers (Mermaid's pre-computed bezier curves were
+  // baked to the original positions, so they'd disconnect otherwise).
+  function wireClusterDrag(svgEl, edges) {
+    // Tag every rendered edge with the source/target ids the spec used,
+    // matching them by emission order (Mermaid renders edges in declaration
+    // order, so spec edges[i] ↔ DOM edgePaths[i]).
+    const edgePaths = Array.from(svgEl.querySelectorAll('g.edgePaths > path, g.edgePaths > g'));
+    edgePaths.forEach((node, i) => {
+      const edge = edges[i];
+      if (!edge) return;
+      const path = node.tagName === 'path' ? node : node.querySelector('path');
+      if (!path) return;
+      const sid = (s) => 'n_' + String(s).replace(/[^a-zA-Z0-9_]/g, '_');
+      path.dataset.archFrom = sid(edge.from);
+      path.dataset.archTo   = sid(edge.to);
+    });
+
+    // Cursor + mousedown handler per cluster.
+    let drag = null;
+    svgEl.querySelectorAll('g.cluster').forEach((cluster) => {
+      cluster.style.cursor = 'grab';
+      cluster.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest('.node')) return; // node click takes precedence
+        e.stopPropagation();
+        e.preventDefault();
+        const cur = cluster.getAttribute('transform') || '';
+        const m = cur.match(/translate\(\s*([-\d.]+)\s*[,\s]\s*([-\d.]+)\s*\)/);
+        const ctm = svgEl.getScreenCTM();
+        drag = {
+          cluster,
+          startX: e.clientX, startY: e.clientY,
+          baseTx: m ? parseFloat(m[1]) : 0,
+          baseTy: m ? parseFloat(m[2]) : 0,
+          // Scale factor so mouse pixels map to SVG units.
+          scale: ctm ? ctm.a : 1,
+        };
+        cluster.style.cursor = 'grabbing';
+      });
+    });
+
+    const onMove = (e) => {
+      if (!drag) return;
+      const dx = (e.clientX - drag.startX) / drag.scale;
+      const dy = (e.clientY - drag.startY) / drag.scale;
+      const newT = `translate(${drag.baseTx + dx}, ${drag.baseTy + dy})`;
+      // Preserve any other transform parts (rotate, scale) by replacing only
+      // the translate; if none existed, append.
+      const cur = drag.cluster.getAttribute('transform') || '';
+      drag.cluster.setAttribute(
+        'transform',
+        /translate\(/.test(cur) ? cur.replace(/translate\([^)]+\)/, newT) : newT,
+      );
+      redrawArchEdges(svgEl);
+    };
+    const onUp = () => {
+      if (!drag) return;
+      drag.cluster.style.cursor = 'grab';
+      drag = null;
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  function redrawArchEdges(svgEl) {
+    const ctm = svgEl.getScreenCTM();
+    if (!ctm) return;
+    const inv = ctm.inverse();
+    const svgRect = svgEl.getBoundingClientRect();
+    const nodeCache = new Map();
+    const findNode = (sid) => {
+      if (nodeCache.has(sid)) return nodeCache.get(sid);
+      // Mermaid node ids look like `flowchart-n_welcome_page-0`.
+      const node = svgEl.querySelector(`g.node[id^="flowchart-${sid}-"]`) ||
+                   svgEl.querySelector(`g.node[id*="${sid}"]`);
+      nodeCache.set(sid, node);
+      return node;
+    };
+    const centerInSvg = (el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      // Convert client → SVG-internal coordinates.
+      try {
+        const pt = new DOMPoint(cx, cy).matrixTransform(inv);
+        return { x: pt.x, y: pt.y, w: r.width / ctm.a, h: r.height / ctm.d };
+      } catch (_) {
+        return { x: cx - svgRect.left, y: cy - svgRect.top, w: r.width, h: r.height };
+      }
+    };
+
+    svgEl.querySelectorAll('g.edgePaths path, g.edgePaths g path').forEach((path) => {
+      const from = path.dataset.archFrom;
+      const to   = path.dataset.archTo;
+      if (!from || !to) return;
+      const f = findNode(from);
+      const t = findNode(to);
+      if (!f || !t) return;
+      const fc = centerInSvg(f);
+      const tc = centerInSvg(t);
+      // Orthogonal path: pick the dominant axis for the elbow.
+      const dx = tc.x - fc.x;
+      const dy = tc.y - fc.y;
+      let d;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const goingRight = dx >= 0;
+        const fx = goingRight ? fc.x + fc.w / 2 : fc.x - fc.w / 2;
+        const tx = goingRight ? tc.x - tc.w / 2 : tc.x + tc.w / 2;
+        const elbow = fx + (tx - fx) * 0.5;
+        d = `M ${fx} ${fc.y} L ${elbow} ${fc.y} L ${elbow} ${tc.y} L ${tx} ${tc.y}`;
+      } else {
+        const goingDown = dy >= 0;
+        const fy = goingDown ? fc.y + fc.h / 2 : fc.y - fc.h / 2;
+        const ty = goingDown ? tc.y - tc.h / 2 : tc.y + tc.h / 2;
+        const elbow = fy + (ty - fy) * 0.5;
+        d = `M ${fc.x} ${fy} L ${fc.x} ${elbow} L ${tc.x} ${elbow} L ${tc.x} ${ty}`;
+      }
+      path.setAttribute('d', d);
+    });
   }
 
   function fitMermaid(pz, svgEl, container) {
