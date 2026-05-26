@@ -114,14 +114,20 @@
   function mountCanvas(parent) {
     const canvas = el('div', { class: 'canvas' });
     const scene = el('div', { class: 'canvas__scene' });
-    const edges = el('svg', { class: 'canvas__edges', xmlns: 'http://www.w3.org/2000/svg' });
+    // SVG MUST be created in the SVG namespace — `document.createElement('svg')`
+    // produces an HTMLUnknownElement that does not render its children as SVG.
+    const edges = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    edges.setAttribute('class', 'canvas__edges');
     const controls = el('div', { class: 'canvas__controls' }, [
       el('button', { type: 'button', 'data-zoom': 'in',    title: 'Zoom in' }, '+'),
       el('button', { type: 'button', 'data-zoom': 'out',   title: 'Zoom out' }, '−'),
       el('button', { type: 'button', 'data-zoom': 'fit',   title: 'Fit' }, '⤢'),
       el('button', { type: 'button', 'data-zoom': 'reset', title: 'Reset' }, '⟲'),
     ]);
-    canvas.appendChild(scene); canvas.appendChild(edges); canvas.appendChild(controls);
+    // SVG sits INSIDE the scene so it transforms with panzoom — paths drawn
+    // in scene coordinates stay aligned with the cards when the user pans/zooms.
+    scene.appendChild(edges);
+    canvas.appendChild(scene); canvas.appendChild(controls);
     parent.appendChild(canvas);
 
     let pz = null;
@@ -138,7 +144,7 @@
     });
     canvas.addEventListener('dblclick', () => pz && fitToContent(pz, scene, canvas));
 
-    return { canvas, scene, edges };
+    return { canvas, scene, edges, pz };
   }
 
   function fitToContent(pz, scene, canvas) {
@@ -165,15 +171,12 @@
     host.appendChild(ul);
   }
   function renderArchitecture(host, a) {
-    const { canvas, scene, edges } = mountCanvas(host);
-
-    // Lay nodes out in a simple grid based on incoming edges. Good enough for v1.
-    const positions = layoutGrid(a.nodes, a.edges);
+    const { canvas, scene, edges, pz } = mountCanvas(host);
     const byId = new Map();
 
     a.nodes.forEach((n) => {
       const status = a.details?.[n.id]?.status ?? (n.changed ? 'changed' : 'context');
-      const card = el('div', { class: 'node' + ' is-' + status, style: `left:${positions[n.id].x}px; top:${positions[n.id].y}px` }, [
+      const card = el('div', { class: 'node' + ' is-' + status }, [
         el('div', { class: 'node__head' }, [
           el('span', { class: 'node__kind' }, kindIcon(n.kind)),
           el('span', {}, n.label),
@@ -190,8 +193,14 @@
       byId.set(n.id, card);
     });
 
-    // Draw edges as SVG paths after layout settles.
-    requestAnimationFrame(() => drawEdges(a.edges, byId, edges));
+    // Stack into columns by indegree, measure heights, size scene, draw edges, then fit.
+    requestAnimationFrame(() => {
+      reflowAndDraw({
+        scene, edges, byId, nodes: a.nodes, links: a.edges,
+        drawLink: drawArchEdge,
+      });
+      if (pz) fitToContent(pz, scene, canvas);
+    });
 
     function kindIcon(k) {
       return ({ service: 'svc', module: 'mod', datastore: 'db', external: 'ext', ui: 'ui', job: 'job' })[k] || k;
@@ -244,15 +253,20 @@
     host.appendChild(wrap);
   }
   function renderDatabase(host, d) {
-    const { canvas, scene, edges } = mountCanvas(host);
-
-    const positions = layoutGrid(d.tables.map((t) => ({ id: t.id })), d.relations || []);
+    const { canvas, scene, edges, pz } = mountCanvas(host);
     const byId = new Map();
+
+    // Flatten relations down to a links-by-id list for the layout heuristic.
+    const links = (d.relations || []).map((r) => ({
+      from: r.from.split('.')[0],
+      to:   r.to.split('.')[0],
+      status: r.status,
+    }));
 
     d.tables.forEach((t) => {
       const card = el('div', {
         class: `node is-${t.status}`,
-        style: `left:${positions[t.id].x}px; top:${positions[t.id].y}px; min-width:240px;`,
+        style: 'min-width:260px;',
       }, [
         el('div', { class: 'node__head' }, [
           el('span', { class: 'node__kind' }, 'tbl'),
@@ -283,7 +297,15 @@
       byId.set(t.id, card);
     });
 
-    requestAnimationFrame(() => drawRelations(d.relations || [], byId, edges));
+    requestAnimationFrame(() => {
+      reflowAndDraw({
+        scene, edges, byId,
+        nodes: d.tables,
+        links,
+        drawLink: drawRelationEdge,
+      });
+      if (pz) fitToContent(pz, scene, canvas);
+    });
 
     function detailForTable(t) {
       const fields = t.fields.map((f) => `<li><code>${escapeHTML(f.name)}</code> · ${escapeHTML(f.type)} · <em>${escapeHTML(f.status)}</em></li>`).join('');
@@ -332,60 +354,303 @@
     host.appendChild(ul);
   }
 
-  function layoutGrid(nodes, edges) {
-    // Topological-ish: sources on the left, sinks on the right. 240x180 cells.
-    const incoming = new Map(nodes.map((n) => [n.id, 0]));
-    for (const e of edges) incoming.set(e.to, (incoming.get(e.to) || 0) + 1);
-    const sorted = [...nodes].sort((a, b) => (incoming.get(a.id) - incoming.get(b.id)));
-    const colHeight = Math.max(2, Math.ceil(Math.sqrt(sorted.length)));
-    const pos = {};
-    sorted.forEach((n, i) => {
-      const col = Math.floor(i / colHeight);
-      const row = i % colHeight;
-      pos[n.id] = { x: 40 + col * 320, y: 40 + row * 180 };
+  // Layered + orthogonal layout. Sources go to layer 0, then each node lands
+  // in the layer after the deepest of its incoming neighbours (Sugiyama-ish).
+  // Cards in each layer are stacked vertically; edges route right-angle.
+  function reflowAndDraw({ scene, edges, byId, nodes, links, drawLink }) {
+    if (nodes.length === 0) return;
+
+    const layer = assignLayers(nodes, links);
+    const maxLayer = Math.max(0, ...layer.values());
+
+    // Group node ids by layer in input order (stable).
+    const layerGroups = Array.from({ length: maxLayer + 1 }, () => []);
+    nodes.forEach((n) => layerGroups[layer.get(n.id)].push(n.id));
+
+    const padding = 32;
+    const colGap  = 110;  // generous so orthogonal elbows have room
+    const rowGap  = 28;
+
+    // Per-layer width = widest card in that layer.
+    const layerWidths = layerGroups.map((ids) =>
+      ids.reduce((w, id) => Math.max(w, byId.get(id)?.offsetWidth || 0), 0)
+    );
+
+    // Column X positions (one per layer).
+    const colX = [];
+    let cursor = padding;
+    layerWidths.forEach((w) => { colX.push(cursor); cursor += w + colGap; });
+    const sceneW = cursor - colGap + padding;
+
+    // Stack cards in each layer.
+    const colY = new Array(maxLayer + 1).fill(padding);
+    layerGroups.forEach((ids, c) => {
+      ids.forEach((id) => {
+        const card = byId.get(id);
+        if (!card) return;
+        // Center each card horizontally inside its layer's column width.
+        const cardX = colX[c] + (layerWidths[c] - card.offsetWidth) / 2;
+        card.style.left = cardX + 'px';
+        card.style.top  = colY[c] + 'px';
+        colY[c] += card.offsetHeight + rowGap;
+      });
     });
-    return pos;
+    const sceneH = Math.max(padding * 2, ...colY) + padding;
+
+    scene.style.width  = sceneW + 'px';
+    scene.style.height = sceneH + 'px';
+    edges.setAttribute('viewBox', `0 0 ${sceneW} ${sceneH}`);
+    edges.setAttribute('width',  sceneW);
+    edges.setAttribute('height', sceneH);
+
+    while (edges.firstChild) edges.removeChild(edges.firstChild);
+    appendArrowDef(edges);
+
+    // Distribute multiple edges between the same pair so they don't overlap.
+    // Also bucket edges per source card so each gets its own exit Y.
+    const fanOut = new Map(); // sourceId -> [edgeIndices...]
+    links.forEach((link, i) => {
+      const k = link.from;
+      if (!fanOut.has(k)) fanOut.set(k, []);
+      fanOut.get(k).push(i);
+    });
+
+    links.forEach((link, i) => {
+      const siblings = fanOut.get(link.from) || [i];
+      const slot = siblings.indexOf(i);
+      const lane = (slot + 1) / (siblings.length + 1); // 0..1, never 0 or 1
+      drawLink(link, byId, edges, { lane, scene });
+    });
+
+    // Move SVG to the end of scene so labels paint OVER cards (with
+    // pointer-events:none so clicks still hit cards beneath).
+    scene.appendChild(edges);
+
+    // Wire hover focus on cards: dim all unrelated cards + edges.
+    wireFocus(scene, edges, links);
   }
 
-  function drawEdges(edges, byId, svg) {
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    svg.setAttribute('viewBox', `0 0 4000 4000`);
-    svg.setAttribute('width', '4000'); svg.setAttribute('height', '4000');
-    edges.forEach((e) => {
-      const fromCard = byId.get(e.from); const toCard = byId.get(e.to);
-      if (!fromCard || !toCard) return;
-      const fx = parseFloat(fromCard.style.left) + fromCard.offsetWidth;
-      const fy = parseFloat(fromCard.style.top)  + fromCard.offsetHeight / 2;
-      const tx = parseFloat(toCard.style.left);
-      const ty = parseFloat(toCard.style.top)    + toCard.offsetHeight / 2;
-      const cx = (fx + tx) / 2;
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', `M ${fx} ${fy} C ${cx} ${fy}, ${cx} ${ty}, ${tx} ${ty}`);
-      if (e.kind === 'async') path.classList.add('is-async');
-      svg.appendChild(path);
-    });
+  // Longest-path layer assignment over a DAG. For cycles we fall back to the
+  // source's layer + 1 (still safe because each node's layer is monotonically
+  // non-decreasing).
+  function assignLayers(nodes, links) {
+    const layer = new Map(nodes.map((n) => [n.id, 0]));
+    const incoming = new Map(nodes.map((n) => [n.id, []]));
+    for (const l of links) {
+      if (incoming.has(l.to)) incoming.get(l.to).push(l.from);
+    }
+    // Iterate until stable, capped to avoid infinite loops on cycles.
+    for (let pass = 0; pass < nodes.length + 1; pass++) {
+      let changed = false;
+      nodes.forEach((n) => {
+        const ins = incoming.get(n.id) || [];
+        if (ins.length === 0) return;
+        const want = Math.max(...ins.map((id) => (layer.get(id) ?? 0) + 1));
+        if (want > layer.get(n.id)) {
+          layer.set(n.id, want);
+          changed = true;
+        }
+      });
+      if (!changed) break;
+    }
+    // Cap at a reasonable max — wider diagrams get hard to read past ~5 layers.
+    const cap = 5;
+    layer.forEach((v, k) => { if (v > cap) layer.set(k, cap); });
+    return layer;
   }
 
-  function drawRelations(relations, byId, svg) {
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    svg.setAttribute('viewBox', `0 0 4000 4000`);
-    svg.setAttribute('width', '4000'); svg.setAttribute('height', '4000');
-    relations.forEach((r) => {
-      const fromTable = r.from.split('.')[0];
-      const toTable   = r.to.split('.')[0];
-      const fromCard  = byId.get(fromTable);
-      const toCard    = byId.get(toTable);
-      if (!fromCard || !toCard) return;
-      const fx = parseFloat(fromCard.style.left) + fromCard.offsetWidth;
-      const fy = parseFloat(fromCard.style.top)  + fromCard.offsetHeight / 2;
-      const tx = parseFloat(toCard.style.left);
-      const ty = parseFloat(toCard.style.top)    + toCard.offsetHeight / 2;
-      const cx = (fx + tx) / 2;
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', `M ${fx} ${fy} C ${cx} ${fy}, ${cx} ${ty}, ${tx} ${ty}`);
-      if (r.status === 'removed') path.classList.add('is-dimmed');
-      svg.appendChild(path);
+  function wireFocus(scene, edges, links) {
+    const cards = Array.from(scene.querySelectorAll('.node'));
+    const linkPaths = Array.from(edges.querySelectorAll('path:not(.edge-arrow)'));
+    const linksByFrom = new Map();
+    const linksByTo = new Map();
+    links.forEach((l, i) => {
+      if (!linksByFrom.has(l.from)) linksByFrom.set(l.from, []);
+      if (!linksByTo.has(l.to)) linksByTo.set(l.to, []);
+      linksByFrom.get(l.from).push(i);
+      linksByTo.get(l.to).push(i);
     });
+
+    const clearDim = () => {
+      cards.forEach((c) => c.classList.remove('is-dimmed'));
+      linkPaths.forEach((p) => p.classList.remove('is-focus-dim'));
+    };
+    const applyFocus = (id) => {
+      const related = new Set([id]);
+      (linksByFrom.get(id) || []).forEach((i) => related.add(links[i].to));
+      (linksByTo.get(id) || []).forEach((i) => related.add(links[i].from));
+      cards.forEach((c) => {
+        c.classList.toggle('is-dimmed', !related.has(c.getAttribute('data-detail-source')));
+      });
+      linkPaths.forEach((p, i) => {
+        const link = links[i];
+        const active = link && (link.from === id || link.to === id);
+        p.classList.toggle('is-focus-dim', !active);
+      });
+    };
+    cards.forEach((c) => {
+      c.addEventListener('mouseenter', () => applyFocus(c.getAttribute('data-detail-source')));
+    });
+    // Clear when the mouse leaves the canvas entirely, NOT when it merely
+    // transitions between cards inside the canvas. mouseleave on the canvas
+    // container doesn't bubble from children, so it fires only at the boundary.
+    const canvas = scene.parentElement; // .canvas
+    if (canvas) canvas.addEventListener('mouseleave', clearDim);
+  }
+
+  // Reusable arrowhead marker. One <defs> per SVG; drawLink references it.
+  function appendArrowDef(svg) {
+    const ns = 'http://www.w3.org/2000/svg';
+    const defs = document.createElementNS(ns, 'defs');
+    const marker = document.createElementNS(ns, 'marker');
+    marker.setAttribute('id', 'edge-arrow');
+    marker.setAttribute('viewBox', '0 0 10 10');
+    marker.setAttribute('refX', '9');
+    marker.setAttribute('refY', '5');
+    marker.setAttribute('markerWidth', '7');
+    marker.setAttribute('markerHeight', '7');
+    marker.setAttribute('orient', 'auto-start-reverse');
+    const arrow = document.createElementNS(ns, 'path');
+    arrow.setAttribute('d', 'M 0 0 L 10 5 L 0 10 z');
+    arrow.setAttribute('fill', 'currentColor');
+    arrow.setAttribute('class', 'edge-arrow');
+    marker.appendChild(arrow);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+  }
+
+  // Orthogonal "Manhattan" routing: right-angle path with two elbows. The
+  // `lane` param (0..1) shifts the elbow point vertically when many edges
+  // share the same source, so they don't all stack on top of each other.
+  function routePath(fromCard, toCard, opts = {}) {
+    const lane = typeof opts.lane === 'number' ? opts.lane : 0.5;
+    const fl = parseFloat(fromCard.style.left), ft = parseFloat(fromCard.style.top);
+    const fw = fromCard.offsetWidth,             fh = fromCard.offsetHeight;
+    const tl = parseFloat(toCard.style.left),    tt = parseFloat(toCard.style.top);
+    const tw = toCard.offsetWidth,               th = toCard.offsetHeight;
+    const fcx = fl + fw / 2, fcy = ft + fh / 2;
+    const tcx = tl + tw / 2, tcy = tt + th / 2;
+    const dx = tcx - fcx;
+    const dy = tcy - fcy;
+    // Source anchor sits a fraction of card height down so multiple edges
+    // from the same source exit at different Y positions.
+    const sourceOffsetY = (lane - 0.5) * (fh - 16);
+
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      // Horizontal-dominant: source right → vertical leg → target left.
+      const goingRight = dx >= 0;
+      const fx = goingRight ? fl + fw : fl;
+      const fy = ft + fh / 2 + sourceOffsetY;
+      const tx = goingRight ? tl : tl + tw;
+      const ty = tt + th / 2;
+      // Elbow X sits between the two cards, biased toward target by lane.
+      const elbowX = fx + (tx - fx) * (0.5 + (lane - 0.5) * 0.4);
+      return `M ${fx} ${fy} L ${elbowX} ${fy} L ${elbowX} ${ty} L ${tx} ${ty}`;
+    } else {
+      // Vertical-dominant: source bottom/top → horizontal leg → target top/bottom.
+      const goingDown = dy >= 0;
+      const fx = fl + fw / 2;
+      const fy = goingDown ? ft + fh : ft;
+      const tx = tl + tw / 2;
+      const ty = goingDown ? tt : tt + th;
+      const elbowY = fy + (ty - fy) * (0.5 + (lane - 0.5) * 0.4);
+      return `M ${fx} ${fy} L ${fx} ${elbowY} L ${tx} ${elbowY} L ${tx} ${ty}`;
+    }
+  }
+
+  function drawArchEdge(e, byId, svg, opts = {}) {
+    const fromCard = byId.get(e.from); const toCard = byId.get(e.to);
+    if (!fromCard || !toCard) return;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', routePath(fromCard, toCard, opts));
+    path.setAttribute('marker-end', 'url(#edge-arrow)');
+    path.setAttribute('data-from', e.from);
+    path.setAttribute('data-to', e.to);
+    if (e.kind === 'async') path.classList.add('is-async');
+    if (e.kind === 'data')  path.classList.add('is-data');
+    svg.appendChild(path);
+    if (e.label) appendEdgeLabel(svg, fromCard, toCard, e.label, opts.scene || svg.parentElement, opts);
+  }
+
+  function drawRelationEdge(r, byId, svg, opts = {}) {
+    const fromCard = byId.get(r.from); const toCard = byId.get(r.to);
+    if (!fromCard || !toCard) return;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', routePath(fromCard, toCard, opts));
+    path.setAttribute('marker-end', 'url(#edge-arrow)');
+    path.setAttribute('data-from', r.from);
+    path.setAttribute('data-to', r.to);
+    if (r.status === 'removed') path.classList.add('is-dimmed');
+    if (r.status === 'added')   path.classList.add('is-added');
+    svg.appendChild(path);
+  }
+
+  // Position labels on the vertical leg of orthogonal edges — that's the
+  // inter-column gap, guaranteed empty space. Per-lane vertical offset
+  // staggers labels for edges sharing the same source.
+  function appendEdgeLabel(svg, fromCard, toCard, label, scene, opts = {}) {
+    const lane = typeof opts.lane === 'number' ? opts.lane : 0.5;
+    const fl = parseFloat(fromCard.style.left), ft = parseFloat(fromCard.style.top);
+    const fw = fromCard.offsetWidth,             fh = fromCard.offsetHeight;
+    const tl = parseFloat(toCard.style.left),    tt = parseFloat(toCard.style.top);
+    const tw = toCard.offsetWidth,               th = toCard.offsetHeight;
+    const dx = (tl + tw / 2) - (fl + fw / 2);
+    const dy = (tt + th / 2) - (ft + fh / 2);
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+
+    let lx, ly, anchor;
+    if (horizontal) {
+      const goingRight = dx >= 0;
+      const fx = goingRight ? fl + fw : fl;
+      const tx = goingRight ? tl : tl + tw;
+      const fy = ft + fh / 2 + (lane - 0.5) * (fh - 16);
+      const ty = tt + th / 2;
+      // Elbow X matches routePath. Center label on the vertical leg so it
+      // doesn't extend toward either neighbouring card.
+      const elbowX = fx + (tx - fx) * (0.5 + (lane - 0.5) * 0.4);
+      lx = elbowX;
+      ly = (fy + ty) / 2 + 4;
+      anchor = 'middle';
+    } else {
+      const goingDown = dy >= 0;
+      const fy = goingDown ? ft + fh : ft;
+      const ty = goingDown ? tt : tt + th;
+      const fx = fl + fw / 2;
+      const tx = tl + tw / 2;
+      const elbowY = fy + (ty - fy) * (0.5 + (lane - 0.5) * 0.4);
+      lx = (fx + tx) / 2;
+      ly = elbowY - 6;
+      anchor = 'middle';
+    }
+
+    // Skip labels whose anchor falls inside an unrelated card.
+    if (scene) {
+      for (const node of scene.children) {
+        if (node === fromCard || node === toCard) continue;
+        if (!node.classList?.contains('node')) continue;
+        const nl = parseFloat(node.style.left || 0), nt = parseFloat(node.style.top || 0);
+        const nw = node.offsetWidth, nh = node.offsetHeight;
+        if (lx >= nl - 4 && lx <= nl + nw + 4 && ly >= nt - 4 && ly <= nt + nh + 4) return;
+      }
+    }
+
+    // Truncate labels longer than the inter-column gap can fit (~20 chars
+    // at 11px mono ≈ 130px). Full label still lives in the spec JSON.
+    const MAX = 22;
+    const display = label.length > MAX ? label.slice(0, MAX - 1) + '…' : label;
+
+    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    text.setAttribute('x', lx);
+    text.setAttribute('y', ly);
+    text.setAttribute('text-anchor', anchor);
+    text.setAttribute('class', 'edge-label');
+    text.textContent = display;
+    if (display !== label) {
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      title.textContent = label;
+      text.appendChild(title);
+    }
+    svg.appendChild(text);
   }
 
   // ---------- shared helpers exposed for renderers ----------

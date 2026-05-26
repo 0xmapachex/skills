@@ -34,5 +34,5 @@ test('db renderer ships field-row class wiring', () => {
 
 test('db renderer draws relations on canvas', () => {
   const html = renderHTML(DB_FIXTURE);
-  assert.ok(html.includes('drawRelations'), 'drawRelations helper missing');
+  assert.ok(html.includes('drawRelationEdge'), 'drawRelationEdge helper missing');
 });

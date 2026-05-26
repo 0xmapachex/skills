@@ -81,7 +81,7 @@ body {
 /* ===== Canvas (panzoom viewport) ===== */
 .canvas {
   position: relative;
-  height: 560px;
+  height: 720px;
   border: 1px solid var(--border);
   border-radius: 4px;
   overflow: hidden;
@@ -89,9 +89,9 @@ body {
     radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0)
     0 0 / 24px 24px var(--bg);
 }
+/* Width/height get set by JS after layout measures card heights. */
 .canvas__scene {
   position: absolute; top: 0; left: 0; transform-origin: 0 0;
-  width: 4000px; height: 4000px;
 }
 .canvas__controls {
   position: absolute; bottom: 12px; right: 12px; display: flex; gap: 4px;
@@ -103,13 +103,38 @@ body {
   cursor: pointer; font-size: 12px; border-radius: 2px;
 }
 .canvas__controls button:hover { background: var(--border); }
+
+/* SVG lives inside .canvas__scene so paths pan/zoom with the cards. The
+   pointer-events:none lets clicks pass through to the cards beneath.
+   width/height:100% means the SVG fills the JS-sized scene — without these
+   the SVG collapses to 0×0 and paths render invisibly. */
 .canvas__edges {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
   pointer-events: none;
+  color: var(--border-hi);
+  overflow: visible;
 }
-.canvas__edges path { stroke: var(--border-hi); stroke-width: 1.5; fill: none; }
-.canvas__edges path.is-async { stroke-dasharray: 6 4; }
-.canvas__edges path.is-dimmed { opacity: 0.4; }
+.canvas__edges path {
+  stroke: var(--border-hi); stroke-width: 1.6; fill: none;
+}
+.canvas__edges path.is-async   { stroke-dasharray: 6 4; }
+.canvas__edges path.is-data    { stroke: var(--changed); }
+.canvas__edges path.is-added   { stroke: var(--added); }
+.canvas__edges path.is-dimmed  { opacity: 0.35; stroke-dasharray: 3 3; }
+.canvas__edges .edge-arrow     { fill: var(--border-hi); }
+.canvas__edges .edge-label {
+  fill: var(--fg-muted);
+  font-size: 11px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+}
+
+/* Hover-focus: dim cards and edges not connected to the hovered card. */
+.node.is-dimmed { opacity: 0.25; transition: opacity 120ms ease; }
+.canvas__edges path.is-focus-dim { opacity: 0.08; transition: opacity 120ms ease; }
 
 /* ===== UML / ER cards ===== */
 .node {
