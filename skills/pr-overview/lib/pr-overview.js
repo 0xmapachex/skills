@@ -248,66 +248,253 @@
     host.appendChild(gaps);
   }
 
+  // Architecture is rendered via Mermaid flowchart. Subgraphs group nodes by
+  // kind (ui / service / module / datastore / external / job) so the graph
+  // reads as a C4-style container view. Click handlers route to the detail
+  // panel; status colors come from classDef.
   function renderArchitecture(host, a) {
     host.appendChild(el('p', {}, [
-      el('span', {}, 'The components touched by this branch, laid out left-to-right by who calls whom. '),
-      el('strong', {}, 'Hover any card '),
-      el('span', {}, 'to trace its connections. '),
-      el('strong', {}, 'Click '),
-      el('span', {}, 'to see its responsibilities, files, and status.'),
+      el('span', {}, 'The components this branch touches, grouped by kind and connected by who calls whom. '),
+      el('strong', {}, 'Click any box '),
+      el('span', {}, 'to see its responsibilities, files, and status. The diagram is laid out automatically — use the controls at the bottom right to zoom or fit.'),
     ]));
 
-    const wrap = mountCanvas(host);
-    wrap.canvas.appendChild(el('div', { class: 'canvas__hint' }, 'hover to focus · scroll-wheel + ctrl to zoom · drag to pan'));
+    const id = 'arch-mmd-' + Math.random().toString(36).slice(2, 9);
+    const wrap = el('div', { class: 'mmd-wrap' });
+    const inner = el('div', { class: 'mmd-inner' });
+    const hint = el('div', { class: 'mmd-hint' }, 'click any node · ctrl+wheel to zoom · drag to pan');
+    const mmdHost = el('pre', { class: 'mermaid', id });
+    inner.appendChild(mmdHost);
+    wrap.appendChild(hint);
+    wrap.appendChild(inner);
+    wrap.appendChild(mmdControls(inner));
+    host.appendChild(wrap);
 
-    const byId = new Map();
-    a.nodes.forEach((node) => {
-      const status = a.details?.[node.id]?.status ?? (node.changed ? 'changed' : 'context');
-      const card = el('div', { class: 'node is-' + status }, [
-        el('div', { class: 'node__head' }, [
-          el('span', { class: 'node__kind' }, kindLabel(node.kind)),
-          el('span', {}, node.label),
-          status !== 'context' ? el('span', { class: 'status-chip is-' + status }, statusChipText(status)) : null,
-        ]),
-        renderArchBody(a.details?.[node.id]),
-      ]);
-      card.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openDetail(detailForArchNode(node, a.details?.[node.id]));
-      });
-      card.setAttribute('data-detail-source', node.id);
-      wrap.scene.appendChild(card);
-      byId.set(node.id, card);
-    });
-
-    requestAnimationFrame(() => {
-      reflowAndDraw({
-        scene: wrap.scene, edges: wrap.edges, byId,
-        nodes: a.nodes, links: a.edges,
-        drawLink: drawArchEdge,
-      });
-      if (wrap.pz) fitToContent(wrap.pz, wrap.scene, wrap.canvas);
-    });
-
-    function kindLabel(k) { return k || '?'; }
-    function statusChipText(s) { return ({ added: '+ added', changed: '~ changed', removed: '− removed' })[s] || s; }
-    function renderArchBody(details) {
-      if (!details?.responsibilities?.length) return el('div');
-      return el('div', { class: 'node__body' }, [
-        el('ul', {}, details.responsibilities.slice(0, 4).map((r) => el('li', {}, r))),
-      ]);
+    // Expose a global handler Mermaid can call from click directives.
+    if (!window.__archDetailFor) {
+      window.__archDetail = {};
+      window.__archDetailFor = (key) => {
+        const entry = window.__archDetail[key];
+        if (!entry) return;
+        openDetail(entry);
+      };
     }
-    function detailForArchNode(node, d) {
+    const detailKey = id;
+    window.__archDetail[detailKey] = null; // placeholder; per-node entries set below
+
+    mmdHost.textContent = buildMermaid(a, detailKey);
+
+    // Mermaid v11 is available as `window.mermaid`. We initialise it once
+    // with theme variables matching the active palette, then render this graph.
+    runMermaid(mmdHost, () => wireMermaidInteractions(mmdHost, a, inner));
+  }
+
+  function buildMermaid(a, detailKey) {
+    const sid = (s) => 'n_' + String(s).replace(/[^a-zA-Z0-9_]/g, '_');
+    const esc = (s) => String(s).replace(/"/g, '#quot;').replace(/[<>]/g, '');
+    // LR (left-right) reads as a system flow: entries on the left, datastores
+    // on the right. Subgraphs group by kind so it stays organised.
+    const lines = ['flowchart LR'];
+
+    // Group nodes by kind for subgraphs. Order kinds so UI/entry points are
+    // on the left, datastores/externals on the right.
+    const KIND_ORDER = ['ui', 'service', 'module', 'job', 'datastore', 'external'];
+    const KIND_LABEL = {
+      ui: 'UI surfaces', service: 'Services', module: 'Modules',
+      job: 'Jobs / Cron', datastore: 'Data', external: 'External',
+    };
+    const grouped = new Map();
+    a.nodes.forEach((n) => {
+      const k = n.kind || 'module';
+      if (!grouped.has(k)) grouped.set(k, []);
+      grouped.get(k).push(n);
+    });
+
+    KIND_ORDER.forEach((kind) => {
+      const nodes = grouped.get(kind);
+      if (!nodes || !nodes.length) return;
+      lines.push(`  subgraph g_${kind}["${esc(KIND_LABEL[kind] || kind)}"]`);
+      lines.push('    direction TB');
+      nodes.forEach((n) => {
+        lines.push(`    ${sid(n.id)}["${esc(n.label)}"]`);
+      });
+      lines.push('  end');
+    });
+
+    // Edges. Use stylistic differentiation by `kind`.
+    a.edges.forEach((e) => {
+      const arrow =
+        e.kind === 'async' ? '-. ' :
+        e.kind === 'data'  ? '== ' :
+                              '-- ';
+      const close =
+        e.kind === 'async' ? ' .-> ' :
+        e.kind === 'data'  ? ' ==> ' :
+                              ' --> ';
+      const label = e.label ? `"${esc(e.label)}"` : '';
+      lines.push(`  ${sid(e.from)} ${arrow}${label}${close}${sid(e.to)}`);
+    });
+
+    // Status colors via classDef.
+    lines.push('  classDef added   fill:#e3ece6,stroke:#15604c,stroke-width:2px,color:#0d4234');
+    lines.push('  classDef changed fill:#e1e8f3,stroke:#355b94,stroke-width:2px,color:#1c3a6b');
+    lines.push('  classDef removed fill:#f0e0d6,stroke:#a4452c,stroke-width:2px,color:#5a2510,stroke-dasharray:5 5');
+    lines.push('  classDef context fill:#fbf9f3,stroke:#ddd4bf,color:#5b5347');
+
+    a.nodes.forEach((n) => {
+      const status = a.details?.[n.id]?.status ?? (n.changed ? 'changed' : 'context');
+      lines.push(`  class ${sid(n.id)} ${status}`);
+    });
+
+    // Click handlers wire each node id to a stored detail-panel entry.
+    a.nodes.forEach((n) => {
+      const key = detailKey + ':' + n.id;
+      lines.push(`  click ${sid(n.id)} call __archDetailFor("${key}")`);
+    });
+
+    return lines.join('\n');
+  }
+
+  function runMermaid(mmdHost, afterRender) {
+    const init = () => {
+      const theme = document.documentElement.getAttribute('data-theme') || 'paper';
+      const paper = theme === 'paper';
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'loose', // needed for click call directives
+        flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false, nodeSpacing: 30, rankSpacing: 55, padding: 12 },
+        theme: 'base',
+        themeVariables: paper ? {
+          fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',
+          background: '#fbf9f3',
+          primaryColor: '#fbf9f3',
+          primaryBorderColor: '#ddd4bf',
+          primaryTextColor: '#211e19',
+          lineColor: '#5b5347',
+          secondaryColor: '#f0e6cf',
+          tertiaryColor: '#e3ece6',
+          clusterBkg: '#f3efe6',
+          clusterBorder: '#ddd4bf',
+          edgeLabelBackground: '#fbf9f3',
+        } : {
+          fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',
+          background: '#161b22',
+          primaryColor: '#161b22',
+          primaryBorderColor: '#30363d',
+          primaryTextColor: '#e6edf3',
+          lineColor: '#c9d1d9',
+          secondaryColor: '#21262d',
+          tertiaryColor: 'rgba(63,185,80,0.15)',
+          clusterBkg: '#0e1116',
+          clusterBorder: '#30363d',
+          edgeLabelBackground: '#161b22',
+        },
+      });
+      window.mermaid.run({ nodes: [mmdHost] }).then(afterRender);
+    };
+    if (window.mermaid) init();
+    else {
+      const wait = () => window.mermaid ? init() : setTimeout(wait, 30);
+      wait();
+    }
+  }
+
+  function wireMermaidInteractions(mmdHost, a, scrollWrap) {
+    // Store per-node detail HTML keyed by `${graphId}:${nodeId}` so the
+    // Mermaid-generated click directives can find them.
+    a.nodes.forEach((n) => {
+      const d = a.details?.[n.id];
       const files = (d?.files ?? []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
       const resp  = (d?.responsibilities ?? []).map((r) => `<li>${escapeHTML(r)}</li>`).join('');
-      return `
-        <h3>${escapeHTML(node.label)}</h3>
-        <p><span class="chip">${escapeHTML(node.kind)}</span></p>
+      const status = d?.status ?? (n.changed ? 'changed' : 'context');
+      window.__archDetail[mmdHost.id + ':' + n.id] = `
+        <h3>${escapeHTML(n.label)}</h3>
+        <p>
+          <span class="chip">${escapeHTML(n.kind || 'module')}</span>
+          ${status !== 'context' ? `<span class="status-chip is-${status}" style="margin-left:6px">${status}</span>` : ''}
+        </p>
         ${d?.summary ? `<p>${escapeHTML(d.summary)}</p>` : ''}
         ${resp ? `<h4>Responsibilities</h4><ul>${resp}</ul>` : ''}
         ${files ? `<h4>Files</h4><div class="spec__files">${files}</div>` : ''}
       `;
+    });
+
+    // Pin the SVG element to its viewBox dimensions in CSS pixels so the
+    // browser doesn't pre-shrink content. Panzoom is then the ONLY scaler.
+    const svgEl = mmdHost.querySelector('svg');
+    if (!svgEl) return;
+    const vbAttr = svgEl.getAttribute('viewBox');
+    if (vbAttr) {
+      const [, , vbW, vbH] = vbAttr.split(/\s+/).map(Number);
+      if (vbW && vbH) {
+        svgEl.style.width  = vbW + 'px';
+        svgEl.style.height = vbH + 'px';
+      }
     }
+    svgEl.style.maxWidth = 'none';
+    svgEl.style.display = 'block';
+
+    if (typeof window.panzoom === 'function') {
+      const pz = window.panzoom(svgEl, {
+        smoothScroll: false,
+        minZoom: 0.3, maxZoom: 4,
+        beforeWheel: (e) => !e.ctrlKey && !e.metaKey,
+        beforeMouseDown: (e) => !!e.target.closest?.('.node'),
+      });
+      scrollWrap._pz = pz;
+      requestAnimationFrame(() => fitMermaid(pz, svgEl, scrollWrap));
+    }
+  }
+
+  function fitMermaid(pz, svgEl, container) {
+    if (!pz) return;
+    const bbox = svgEl.getBBox();
+    if (!bbox || !bbox.width) return;
+    const padding = 24;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    // Compute the SVG's CSS-rendered position (it lives inside an absolutely
+    // positioned scene). Account for negative-origin viewBoxes by reading
+    // the viewBox attribute directly.
+    const vb = (svgEl.getAttribute('viewBox') || '0 0 0 0').split(/\s+/).map(Number);
+    const vbX = vb[0] || 0, vbY = vb[1] || 0;
+    // Width fit: scale so the diagram exactly fills the container width.
+    // Height fit: separately, ensure we don't zoom in past 1.4x for tiny
+    // diagrams, and don't shrink below ~0.5 for very large ones.
+    let scale = (cw - padding * 2) / bbox.width;
+    scale = Math.min(scale, 1.4);
+    scale = Math.max(scale, 0.5);
+    pz.zoomAbs(0, 0, scale);
+    // Center horizontally; pin to top vertically with padding.
+    const renderedW = bbox.width * scale;
+    const renderedX = (bbox.x - vbX) * scale;
+    const renderedY = (bbox.y - vbY) * scale;
+    const offsetX = (cw - renderedW) / 2 - renderedX;
+    const offsetY = padding - renderedY;
+    pz.moveTo(offsetX, offsetY);
+  }
+
+  function mmdControls(scrollWrap) {
+    const controls = el('div', { class: 'canvas__controls' }, [
+      el('button', { type: 'button', 'data-zoom': 'in',    title: 'Zoom in' }, '+'),
+      el('button', { type: 'button', 'data-zoom': 'out',   title: 'Zoom out' }, '−'),
+      el('button', { type: 'button', 'data-zoom': 'fit',   title: 'Fit' }, '⤢'),
+      el('button', { type: 'button', 'data-zoom': 'reset', title: 'Reset' }, '⟲'),
+    ]);
+    controls.addEventListener('click', (e) => {
+      const action = e.target.getAttribute?.('data-zoom');
+      const pz = scrollWrap._pz;
+      if (!action || !pz) return;
+      const rect = scrollWrap.getBoundingClientRect();
+      if (action === 'in')    pz.smoothZoom(rect.width / 2, rect.height / 2, 1.25);
+      if (action === 'out')   pz.smoothZoom(rect.width / 2, rect.height / 2, 0.8);
+      if (action === 'reset') { pz.zoomAbs(0, 0, 1); pz.moveTo(0, 0); }
+      if (action === 'fit') {
+        const svgEl = scrollWrap.querySelector('svg');
+        if (svgEl) fitMermaid(pz, svgEl, scrollWrap);
+      }
+    });
+    return controls;
   }
 
   function renderFlow(host, f) {
