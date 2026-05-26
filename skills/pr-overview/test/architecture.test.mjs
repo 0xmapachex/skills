@@ -24,7 +24,7 @@ function renderHTML(spec) {
 test('arch renderer emits one .node per spec.architecture.nodes entry', () => {
   const html = renderHTML(FIXTURE);
   // JS source check — the renderer creates these classes dynamically
-  assert.ok(html.includes("class: 'node'"), 'node class wiring missing in JS source');
+  assert.ok(html.includes("'node is-'"), 'node class wiring missing in JS source');
   assert.ok(html.includes('is-added'),    'is-added status class missing');
   assert.ok(html.includes('is-changed'),  'is-changed status class missing');
   assert.ok(html.includes('is-removed'),  'is-removed status class missing');
