@@ -21,16 +21,24 @@ function renderHTML(spec) {
   return html;
 }
 
-test('arch renderer emits one .node per spec.architecture.nodes entry', () => {
+test('arch renderer emits Mermaid flowchart syntax with status classDefs', () => {
   const html = renderHTML(FIXTURE);
-  // JS source check — the renderer creates these classes dynamically
-  assert.ok(html.includes("class: 'node'"), 'node class wiring missing in JS source');
-  assert.ok(html.includes('is-added'),    'is-added status class missing');
-  assert.ok(html.includes('is-changed'),  'is-changed status class missing');
-  assert.ok(html.includes('is-removed'),  'is-removed status class missing');
+  assert.ok(html.includes('flowchart LR'),  'mermaid flowchart syntax missing');
+  assert.ok(html.includes('classDef added'),   'added classDef missing');
+  assert.ok(html.includes('classDef changed'), 'changed classDef missing');
+  assert.ok(html.includes('classDef removed'), 'removed classDef missing');
 });
 
-test('arch renderer uses canvas mount', () => {
+test('arch renderer groups nodes by kind in subgraphs', () => {
   const html = renderHTML(FIXTURE);
-  assert.ok(html.includes('mountCanvas('), 'canvas mount not called');
+  // The JS source builds the subgraph identifiers via template literals at
+  // runtime — check for the literal template that produces them.
+  assert.ok(html.includes('subgraph g_${kind}'), 'subgraph builder template missing');
+  assert.ok(html.includes("KIND_ORDER = ['ui', 'service', 'module', 'job', 'datastore', 'external']"), 'kind ordering missing');
+});
+
+test('arch renderer wires click handlers to the detail panel', () => {
+  const html = renderHTML(FIXTURE);
+  assert.ok(html.includes('__archDetailFor'),       'arch detail click handler missing');
+  assert.ok(html.includes('click ${sid(n.id)}'),    'mermaid click directive template missing');
 });

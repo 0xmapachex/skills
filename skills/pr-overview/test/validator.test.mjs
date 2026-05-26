@@ -53,15 +53,6 @@ test('rejects database table field with unknown status', () => {
   );
 });
 
-test('rejects more than 5 code_observations items', () => {
-  const bad = JSON.parse(JSON.stringify(FIXTURE));
-  bad.code_observations = {
-    items: Array.from({ length: 6 }, (_, i) => ({ title: `o${i}`, kind: 'pattern' }))
-  };
-  const { errors } = validate(bad);
-  assert.ok(errors.some((e) => /code_observations\.items/.test(e)), errors.join('\n'));
-});
-
 test('rejects required section with wrong type (summary as array)', () => {
   const bad = { ...FIXTURE, summary: [] };
   const { errors, valid } = validate(bad);
@@ -76,11 +67,11 @@ test('rejects required section with wrong type (meta as string)', () => {
   assert.ok(errors.some((e) => /^meta: must be object/.test(e)), errors.join('\n'));
 });
 
-test('rejects optional section with wrong type (code_observations as string)', () => {
-  const bad = { ...FIXTURE, code_observations: 'bad' };
+test('rejects unknown top-level key (code_observations is no longer supported)', () => {
+  const bad = { ...FIXTURE, code_observations: { items: [] } };
   const { errors, valid } = validate(bad);
   assert.equal(valid, false);
-  assert.ok(errors.some((e) => /^code_observations: must be object/.test(e)), errors.join('\n'));
+  assert.ok(errors.some((e) => /unknown key: code_observations/.test(e)), errors.join('\n'));
 });
 
 test('rejects architecture as null', () => {

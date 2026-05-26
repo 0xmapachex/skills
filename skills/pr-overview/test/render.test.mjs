@@ -27,10 +27,15 @@ test('embeds the spec verbatim as window.__PR_OVERVIEW_DATA__', () => {
   assert.ok(html.includes(JSON.stringify(FIXTURE)), 'spec JSON not found in output');
 });
 
-test('inlines CSS and JS bundles (no external <link> or external <script src>)', () => {
+test('only well-known external resources are referenced (fonts + mermaid)', () => {
   const html = renderToString(FIXTURE);
-  assert.ok(!/<link\s+[^>]*href=/.test(html), 'unexpected external <link>');
-  assert.ok(!/<script\s+[^>]*src=/.test(html), 'unexpected external <script src>');
+  // Allowed externals: Google Fonts <link>, jsDelivr Mermaid <script>.
+  // Anything else is a regression.
+  const ALLOWED = /fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.jsdelivr\.net\/npm\/mermaid/;
+  const linkMatches = html.match(/<link\s+[^>]*href="([^"]+)"/g) || [];
+  const scriptMatches = html.match(/<script\s+[^>]*src="([^"]+)"/g) || [];
+  const bad = [...linkMatches, ...scriptMatches].filter((m) => !ALLOWED.test(m));
+  assert.deepEqual(bad, [], 'unexpected external resource(s): ' + bad.join(', '));
 });
 
 test('throws on invalid spec', () => {

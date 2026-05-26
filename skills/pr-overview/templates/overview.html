@@ -1,33 +1,66 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="paper">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PR Overview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,400;1,9..144,500;1,9..144,600;1,9..144,700;1,9..144,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
   <style>/* __INLINE_CSS__ */</style>
 </head>
 <body>
-  <header class="pr-header">
-    <div class="pr-header__left">
-      <h1 class="pr-header__title" data-bind="meta.title"></h1>
-      <div class="pr-header__meta">
-        <span class="chip" data-bind="meta.base"></span>
-        <span class="chip chip--arrow">→</span>
-        <span class="chip" data-bind="meta.head"></span>
-        <span class="chip chip--muted" data-bind="meta.files_changed" data-suffix=" files"></span>
-        <span class="chip chip--add" data-bind="meta.additions" data-prefix="+"></span>
-        <span class="chip chip--del" data-bind="meta.deletions" data-prefix="−"></span>
-      </div>
-      <div class="pr-header__tags" data-list="meta.pr_type_tags" data-item-class="chip chip--tag"></div>
-    </div>
-    <div class="pr-header__right">
-      <button type="button" data-theme-toggle aria-label="Toggle theme">◐</button>
-    </div>
-  </header>
+  <div class="progress" data-progress></div>
 
-  <main class="pr-main">
-    <!-- Section renderers mount themselves in here based on which keys are present in the spec. -->
-  </main>
+  <div class="shell">
+    <nav class="rail">
+      <div class="rail__brand">
+        <b data-bind="meta.head"></b>
+        <span data-rail-pr></span>
+      </div>
+      <div class="rail__title" data-bind="meta.title"></div>
+      <ol data-nav>
+        <!-- nav links injected by JS -->
+      </ol>
+      <div class="rail__foot">
+        <div data-bind="meta.base" data-prefix="base · "></div>
+        <div data-bind="meta.files_changed" data-suffix=" files changed"></div>
+        <button type="button" data-theme-toggle aria-label="Toggle theme">
+          <span class="theme-toggle__lbl">theme</span>
+          <span class="theme-toggle__icon">◐</span>
+        </button>
+      </div>
+    </nav>
+
+    <main class="main">
+      <header class="hero" id="hero">
+        <div class="hero__eyebrow">
+          <span data-bind="meta.head" data-prefix="branch / "></span>
+          <span class="hero__tag" data-hero-pr></span>
+          <span data-bind="meta.title"></span>
+        </div>
+        <h1 class="hero__title" data-hero-title>PR overview</h1>
+        <p class="hero__stand" data-hero-stand></p>
+        <div class="hero__scroll">
+          <span class="hero__scroll-dash"></span> scroll to read
+        </div>
+      </header>
+
+      <div class="sections" data-sections>
+        <!-- Section bodies mount here. -->
+      </div>
+
+      <footer class="footer">
+        <div class="pr-card">
+          <div class="pr-card__k">ready for review</div>
+          <h3 class="pr-card__h" data-bind="meta.title"></h3>
+          <p class="pr-card__p" data-footer-stand></p>
+          <a class="pr-card__a" data-footer-link href="#">View PR →</a>
+        </div>
+      </footer>
+    </main>
+  </div>
 
   <aside class="detail-panel" data-detail-panel hidden>
     <button type="button" class="detail-panel__close" data-detail-close aria-label="Close panel">×</button>

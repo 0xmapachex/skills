@@ -6,41 +6,85 @@
     "files_changed": 6,
     "additions": 84,
     "deletions": 17,
-    "pr_type_tags": ["feature", "slack"]
+    "pr_type_tags": [
+      "feature",
+      "slack"
+    ]
   },
   "summary": {
-    "bullets": [
-      "Lets the agent post Slack messages to a channel inferred from thread context when no explicit channel is supplied.",
-      "Adds a defensive fallback that no-ops if neither channel nor thread context is available.",
-      "Extends the slack webhook handler signature; no DB or infra changes."
+    "tldr": "Lets the Slack-bound agent post to a channel it infers from thread context when no explicit channel is supplied, with a defensive no-op when context is missing.",
+    "ships": [
+      "`handlePostSlack` accepts inferred channel from thread metadata.",
+      "Defensive no-op when neither channel nor thread context is available.",
+      "Extends the Slack webhook handler signature."
     ]
   },
   "architecture": {
     "nodes": [
-      { "id": "slack-webhook",   "label": "Slack webhook",     "kind": "service", "changed": true },
-      { "id": "tool-handlers",   "label": "tool-handlers.ts",  "kind": "module",  "changed": true },
-      { "id": "managed-agent",   "label": "Managed agent",     "kind": "external","changed": false }
+      {
+        "id": "slack-webhook",
+        "label": "Slack webhook",
+        "kind": "service",
+        "changed": true
+      },
+      {
+        "id": "tool-handlers",
+        "label": "tool-handlers.ts",
+        "kind": "module",
+        "changed": true
+      },
+      {
+        "id": "managed-agent",
+        "label": "Managed agent",
+        "kind": "external",
+        "changed": false
+      }
     ],
     "edges": [
-      { "from": "slack-webhook", "to": "tool-handlers", "label": "dispatch", "kind": "sync" },
-      { "from": "tool-handlers", "to": "managed-agent", "label": "tool_call","kind": "sync" }
+      {
+        "from": "slack-webhook",
+        "to": "tool-handlers",
+        "label": "dispatch",
+        "kind": "sync"
+      },
+      {
+        "from": "tool-handlers",
+        "to": "managed-agent",
+        "label": "tool_call",
+        "kind": "sync"
+      }
     ],
     "details": {
       "slack-webhook": {
         "summary": "Receives Slack events, verifies signatures, derives channel/thread context, dispatches to the orchestrator.",
-        "files": ["lib/slack/webhook.ts:42-118"],
-        "responsibilities": ["verify signature", "derive channel context", "route to orchestrator"],
+        "files": [
+          "lib/slack/webhook.ts:42-118"
+        ],
+        "responsibilities": [
+          "verify signature",
+          "derive channel context",
+          "route to orchestrator"
+        ],
         "status": "changed"
       },
       "tool-handlers": {
         "summary": "Host-side tool implementations the managed agent invokes.",
-        "files": ["lib/tool-handlers.ts:201-244"],
-        "responsibilities": ["handlePostSlack", "handleProposeTx", "handleReviewTx"],
+        "files": [
+          "lib/tool-handlers.ts:201-244"
+        ],
+        "responsibilities": [
+          "handlePostSlack",
+          "handleProposeTx",
+          "handleReviewTx"
+        ],
         "status": "changed"
       },
       "managed-agent": {
         "summary": "Anthropic Managed Agent runtime. Out of process; we treat as black box.",
-        "responsibilities": ["execute model loop", "invoke registered tools"],
+        "responsibilities": [
+          "execute model loop",
+          "invoke registered tools"
+        ],
         "status": "context"
       }
     }

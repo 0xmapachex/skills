@@ -51,9 +51,9 @@ full history.
         --out tmp/pr-overview.html
    ```
 
-6. **Report.** Print the path to the user, and a short text summary
-   mirroring the spec's `summary.bullets`. Offer to open in browser
-   if the environment supports it.
+6. **Report.** Print the path to the user, and a short text recap
+   mirroring the spec's `summary.tldr` + `summary.ships`. Offer to open
+   in browser if the environment supports it.
 
 ## Required vs optional sections
 
@@ -65,24 +65,21 @@ full history.
 | Section            | Trigger (any of)                                                                                                                                                                            |
 |--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `database`         | Diff touches `*.sql`, `**/migrations/**`, `drizzle/schema.ts`, `prisma/schema.prisma`, ORM model files, seed scripts, or columns referenced in new query projections.                       |
-| `flow`             | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" |
+| `flow` / `flows`   | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" Use `flows: []` (one entry per major flow) whenever the PR ships more than one independent flow — never combine them into a single tangled diagram. Reserve singular `flow: {}` for the single-flow case. |
 | `risk_rollout`     | `database` is present OR diff touches `infra/`, `Dockerfile`, `vercel.ts`/`vercel.json`, GitHub workflows, IAM, or env-var defaults.                                                        |
-| `code_observations`| Agent spots: (a) ≥3 near-duplicate blocks across the diff, (b) a TODO/FIXME added, (c) a silently-swallowed error, (d) a comment that contradicts the code, or (e) a hardcoded value that looks env-specific. **Cap at 5 items.** If more, surface a closing item: `"more observations available — run /review for a full audit"`. |
 
 ## Hard rules
 
 1. **Diff scope rule** (above) — verify against `git diff <base>...HEAD`
    before tagging anything.
-2. **Code observations are NEVER findings.** No "must fix", no severity
-   labels in observations, no "this is a bug." Use neutral verbs
-   ("notice", "duplicated", "could be extracted"). Real-bug suspicions go
-   in `open_questions` instead.
-3. **Architecture never invents components.** Every node corresponds to a
+2. **Architecture never invents components.** Every node corresponds to a
    file/directory in the diff or directly imported by one.
-4. **DB diagram never invents tables.** Existing tables appear only when
+3. **DB diagram never invents tables.** Existing tables appear only when
    they are FK targets of changed tables or queried by changed code.
-5. **`open_questions` is reviewer-facing** — clarifications the reviewer
-   should resolve before approving. Not agent uncertainty.
+4. **`open_questions` is reviewer-facing** — clarifications the reviewer
+   should resolve before approving. Not agent uncertainty. Code-quality
+   nits and "interesting patterns" do NOT go here either — those belong
+   in the actual code review, not the overview.
 
 ## Edge cases
 
@@ -111,10 +108,168 @@ Key invariants:
   architecture details and database tables/fields and drives the visual
   coloring uniformly.
 - Architecture node `kind` ∈ `service | module | datastore | external | ui | job`.
+- **Framing fields are structured, never wall-of-text.** Wherever a
+  diagram section opens (`architecture`, each entry in `flows`/`flow`,
+  `database`), the spec MUST supply a **one-sentence lede** (`summary`)
+  + **2–4 short bullets** (`highlights`). The lede is the orientation;
+  the bullets are the load-bearing facts. The list sections
+  (`risk_rollout`, `open_questions`) carry no
+  framing prose — the items ARE the content.
+- **`summary` is the executive briefing.** Three lenses, every one
+  answers a real reviewer question:
+  - `tldr` (REQUIRED, ≤ 360 chars) — 1–2 plain-English sentences a PM,
+    designer, or non-engineer could read and understand. Frame it as
+    **who benefits + what they can now do** (or what gets fixed). Skip
+    file paths, function names, table/column names, route paths — those
+    belong in `ships` and `changes`. Skip backticks here too; the TL;DR
+    is the elevator pitch, not the spec.
+    - **Good:** "New teammates can finish setting up their dashboard
+      access themselves — a short guided flow links their chat account
+      and saves their signing wallet. Admins get a place to review and
+      adjust those wallets."
+    - **Bad (too technical):** "Editors/viewers can self-onboard via a
+      4-step flow that binds them to a Slack identity and a canonical
+      wallet. Admins curate the resulting `signer_identities` rows from
+      a new `/signers` page; the agent reads them via two new tools."
+    - **Bad (too vague):** "Adds onboarding and signer management."
+  - `ships` (REQUIRED, 1–6 items) — the user-visible / agent-visible
+    things this PR delivers. One per line, ≤ 100 chars. Format each as
+    `` `identifier` — short description ``. Example:
+    `` `/welcome` — 4-step first-run flow gated by `requireOnboardedOrRedirect`. ``
+  - `why` (OPTIONAL, ≤ 260 chars) — one sentence on the motivation:
+    what was missing before, what was painful, what the prior workaround
+    looked like. Skip when the PR is purely additive cleanup.
+  - `changes` (OPTIONAL, 1–6 items) — the system-level diff: which
+    tables widen, which env vars are required, which old paths get
+    deprecated. One concern per bullet. Backticks for identifiers.
+  - `topics` (OPTIONAL, ≤ 8 items) — expandable accordions for deep
+    context that doesn't fit elsewhere (see below).
+  - **Example.**
+    ```jsonc
+    "summary": {
+      "tldr": "Editors/viewers can self-onboard via a 4-step flow that binds them to a Slack identity and a canonical wallet. Admins curate the resulting `signer_identities` rows from a new `/signers` page; the agent reads them via two new tools.",
+      "ships": [
+        "`/welcome` — 4-step first-run flow gated by `requireOnboardedOrRedirect`.",
+        "`/signers` — admin owner-mapping grid per managed Safe.",
+        "`map_signer` + `resolve_signers` — canonical lookup tools for the agent.",
+        "Slack OAuth v2 callback path with HMAC-signed state tokens."
+      ],
+      "why": "Editors/viewers couldn't self-onboard before — they joined a tenant but had no canonical wallet, and signer mapping was inferred fuzzily from Slack display names.",
+      "changes": [
+        "`dashboard_users` gains `onboarded_at`, `slack_user_id`, `slack_verification`.",
+        "`signer_identities.created_via` accepts new `dashboard_self` value.",
+        "Old fuzzy `slack_user_lookup` stays for free-text; no longer canonical."
+      ]
+    }
+    ```
+- **`summary.topics` — expandable cards for things that aren't a flow.**
+  When the PR has cross-cutting concerns that don't belong in any single
+  diagram (security invariants, OAuth state design, env-var contracts,
+  one piece of code worth showing inline, a key trade-off), add them as
+  `summary.topics[]`. Each topic is a collapsed accordion below the gap
+  cards in "Why this exists"; the reviewer expands the ones they care
+  about. Shape:
+    ```jsonc
+    "summary": {
+      "bullets": [...],
+      "topics": [
+        {
+          "title":   "OAuth state security",
+          "summary": "HMAC-signed state tokens bind every callback to (`userId`, `tenantId`) with a 10-minute TTL.",
+          "body":    "Optional prose paragraph. Backticks become <code>.",
+          "highlights": [
+            "State signed with `SLACK_STATE_SECRET`, never the session cookie.",
+            "Callback trusts the state token as the source of identity — survives multi-session browsers."
+          ],
+          "code": [
+            {
+              "file": "lib/oauth/state.ts:24-42",
+              "lang": "ts",
+              "body": "export function mintHmacState(...) { ... }"
+            }
+          ]
+        }
+      ]
+    }
+    ```
+  - `title` — 2–5 words naming the concern. Not "this PR changes…", not
+    "topic 1".
+  - `summary` — one sentence (≤ 160 chars), shown when collapsed.
+  - `body` — optional paragraph, expand-only.
+  - `highlights` — optional 2–4 bullet facts.
+  - `code` — optional array of `{ file, lang, body }` snippets. `file`
+    points at the source (path + line range); `body` is the verbatim
+    snippet — keep it ≤ 20 lines, just the load-bearing piece.
+  - Cap at 4–5 topics — it is not the place for the entire PR breakdown,
+    only the things that don't fit elsewhere.
+- **Architecture MUST carry both `summary` and `highlights`.**
+  - `summary` — ONE sentence, ≤ 160 chars, naming what this PR changes at
+    the system level (the new surfaces, the new wiring, the deprecated
+    path). Not "this is an architecture diagram", not "the boxes are
+    grouped by kind". The legend below already explains the color coding;
+    the in-canvas hint already explains zoom/pan — do not repeat either.
+  - `highlights` — 2–4 items. Each item is one fact, ≤ 100 chars, leading
+    with a noun phrase. One concern per bullet: a new component, a new
+    wiring, a deprecated path, a key invariant. Do not run a second
+    thought into the same bullet.
+  - **Inline-code convention:** wrap code-like tokens (file paths,
+    function names, table/column names, env vars, route paths) in
+    backticks: `` `dashboard_users.slack_user_id` ``,
+    `` `requireOnboardedOrRedirect` ``, `` `/welcome` ``. The renderer
+    turns those into `<code>` spans with mono font; reviewers can scan
+    the structural facts from the prose.
+  - **Example.**
+    ```jsonc
+    "architecture": {
+      "summary": "Two new admin surfaces (`/welcome`, `/signers`) wire into existing memory + agent tools and introduce a Slack OAuth callback.",
+      "highlights": [
+        "`/welcome` — 4-step first-run gate driven by `requireOnboardedOrRedirect`.",
+        "Slack OAuth v2 callback writes `dashboard_users.slack_user_id` + `slack_verification`.",
+        "`/signers` curates `signer_identities` rows for the new `map_signer` / `resolve_signers` tools.",
+        "Deprecates the fuzzy `slack_user_lookup` path for canonical signer lookups."
+      ]
+    }
+    ```
+- **Database MUST carry both `summary` and `highlights`** (when the
+  section is present). Same shape as architecture: ONE-sentence lede,
+  2–4 short bullets, `` `backtick` `` inline-code for table/column
+  names + migration ids. Do not describe the diagram ("tables are
+  color-coded", "drag any table"); describe the change: which tables
+  are new, which columns are added, which constraint is introduced,
+  which migration backfills what.
 - Flow actor `kind` ∈ `user | service | module | datastore | external` —
   intentionally narrower than architecture node kinds (no `ui` or `job`
   here; use `service` for those actors when their architectural kind is
   `ui` or `job`).
+- Flows render as **Mermaid `sequenceDiagram`s — one per major flow.** Use
+  the plural `flows: [ { title, summary, actors, steps }, ... ]` whenever
+  the PR ships more than one independent flow. Split criteria: distinct
+  entry point (different route / webhook / cron / user action), distinct
+  set of actors, or distinct outcome. Don't merge unrelated flows just to
+  reuse actors.
+- **Every flow MUST have `title`, `summary`, and `highlights`** —
+  single-flow case included. They are the framing the reviewer reads
+  before the diagram; without them the section opens with no context.
+  Same structured shape as architecture: ONE-sentence lede + 2–4 short
+  bullets. Same `` `backtick` `` inline-code convention.
+  - `title` — a verb phrase that names what the flow accomplishes:
+    "Editor/Viewer first-run onboarding", "Nightly invoice rollup",
+    "Slack OAuth callback → workspace bind". Not "How it flows", not
+    "The flow", not "Sequence diagram".
+  - `summary` — ONE sentence (≤ 160 chars). What triggers the flow, in
+    one breath. Example: "First-run gate that walks any seeded
+    editor/viewer from `onboarded_at NULL` to a fully bound wallet."
+  - `highlights` — 2–4 items, each one fact ≤ 100 chars. What this PR
+    actually changes about this flow: a new step, a new write, a new
+    invariant, a deprecated branch. Example items: "Adds the
+    `requireOnboardedOrRedirect` gate on every authenticated admin
+    page.", "New Slack OAuth v2 callback writes
+    `dashboard_users.slack_user_id`.", "Wallet step inserts
+    `signer_identities` with `created_via='dashboard_self'`."
+- Keep step labels ≤ 80 characters — they don't wrap in the diagram (the
+  renderer truncates with an ellipsis past that). Avoid `;` in step labels
+  — Mermaid treats it as a statement separator; the renderer substitutes
+  it with `,` to keep parsing safe, but it's clearer to phrase around it.
 
 ## Output
 

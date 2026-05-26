@@ -1,246 +1,935 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="paper">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PR Overview</title>
-  <style>/* pr-overview visual system — editorial / HUD aesthetic */
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,400;1,9..144,500;1,9..144,600;1,9..144,700;1,9..144,800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
+  <style>/* pr-overview visual system — editorial PR explainer.
+   Two themes: 'paper' (default, warm cream + green + ochre) and 'dark'.
+   Inspired by branch-notes long-form PR explainers. */
+
+/* ---------- theme tokens ---------- */
+:root[data-theme="paper"] {
+  --paper:        #f3efe6;
+  --paper-tint:   #ece5d5;
+  --surface:      #fbf9f3;
+  --ink:          #211e19;
+  --ink-soft:     #5b5347;
+  --ink-faint:    #938976;
+  --line:         #ddd4bf;
+  --line-soft:    #e7dfcc;
+  --accent:       #15604c;
+  --accent-deep:  #0d4234;
+  --accent-tint:  #e3ece6;
+  --ochre:        #a96e1f;
+  --ochre-tint:   #f0e6cf;
+  --clay:         #a4452c;
+  --clay-tint:    #f0e0d6;
+
+  --added:        #15604c;
+  --added-tint:   #e3ece6;
+  --added-border: #bcd2c8;
+  --changed:      #355b94;
+  --changed-tint: #e1e8f3;
+  --changed-border:#bccadd;
+  --removed:      #a4452c;
+  --removed-tint: #f0e0d6;
+  --removed-border:#dab9a8;
+  --privacy:      #a96e1f;
+
+  --shadow:       0 1px 2px rgba(33,30,25,.04), 0 14px 34px -22px rgba(33,30,25,.30);
+  --shadow-lift:  0 2px 4px rgba(33,30,25,.05), 0 26px 50px -26px rgba(33,30,25,.38);
+
+  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
 
 :root[data-theme="dark"] {
-  --bg:          #0e1116;
-  --bg-elev:    #161b22;
-  --fg:          #e6edf3;
-  --fg-muted:    #8b949e;
-  --border:      #30363d;
-  --border-hi:   #484f58;
-  --added:       #3fb950;
-  --changed:     #58a6ff;
-  --removed:     #f85149;
-  --privacy:     #d29922;
-  --shadow:      0 0 0 1px transparent;
-}
-:root[data-theme="light"] {
-  --bg:          #f7f8fa;
-  --bg-elev:    #ffffff;
-  --fg:          #1f2328;
-  --fg-muted:    #57606a;
-  --border:      #d0d7de;
-  --border-hi:   #8c959f;
-  --added:       #1a7f37;
-  --changed:     #0969da;
-  --removed:     #cf222e;
-  --privacy:     #9a6700;
-  --shadow:      0 0 0 1px transparent;
+  --paper:        #0e1116;
+  --paper-tint:   #161b22;
+  --surface:      #161b22;
+  --ink:          #e6edf3;
+  --ink-soft:     #c9d1d9;
+  --ink-faint:    #8b949e;
+  --line:         #30363d;
+  --line-soft:    #21262d;
+  --accent:       #3fb950;
+  --accent-deep:  #1a7f37;
+  --accent-tint:  rgba(63,185,80,0.12);
+  --ochre:        #d29922;
+  --ochre-tint:   rgba(210,153,34,0.12);
+  --clay:         #f85149;
+  --clay-tint:    rgba(248,81,73,0.12);
+
+  --added:        #3fb950;
+  --added-tint:   rgba(63,185,80,0.15);
+  --added-border: rgba(63,185,80,0.45);
+  --changed:      #58a6ff;
+  --changed-tint: rgba(88,166,255,0.15);
+  --changed-border:rgba(88,166,255,0.45);
+  --removed:      #f85149;
+  --removed-tint: rgba(248,81,73,0.15);
+  --removed-border:rgba(248,81,73,0.45);
+  --privacy:      #d29922;
+
+  --shadow:       0 1px 2px rgba(0,0,0,.4), 0 14px 34px -22px rgba(0,0,0,.7);
+  --shadow-lift:  0 2px 4px rgba(0,0,0,.5), 0 26px 50px -26px rgba(0,0,0,.85);
+
+  --serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --sans:  'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:  'IBM Plex Mono', ui-monospace, Menlo, monospace;
 }
 
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
 body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+::selection { background: var(--accent); color: var(--paper); }
+a { color: inherit; }
+
+/* ---------- scroll progress ---------- */
+.progress {
+  position: fixed; top: 0; left: 0; height: 3px; width: 0%;
+  z-index: 60;
+  background: linear-gradient(90deg, var(--accent), var(--ochre));
+  transition: width .12s linear;
+}
+
+/* ---------- layout shell ---------- */
+.shell {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+
+/* ---------- left rail ---------- */
+nav.rail {
+  position: sticky; top: 0;
+  align-self: start;
+  height: 100vh;
+  padding: 42px 24px 24px 40px;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--line);
+}
+.rail__brand {
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent); font-weight: 500;
+  display: flex; gap: 10px;
+}
+.rail__brand b { color: var(--ink); font-weight: 500; }
+.rail__title {
+  font-family: var(--serif); font-size: 23px; line-height: 1.22;
+  margin: 18px 0 30px; font-weight: 800;
+  font-variation-settings: 'SOFT' 30, 'WONK' 0;
+}
+.rail ol {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 2px;
+  border-left: 1px solid var(--line);
+}
+.rail a {
+  display: flex; gap: 11px; padding: 8px 0 8px 16px;
+  margin-left: -1px;
+  border-left: 1px solid transparent;
+  font-size: 13.5px; color: var(--ink-faint);
+  text-decoration: none; transition: .25s;
+  align-items: baseline;
+}
+.rail a .n { font-family: var(--mono); font-size: 11px; }
+.rail a:hover { color: var(--ink-soft); }
+.rail a.is-active {
+  color: var(--ink); border-left-color: var(--accent); font-weight: 500;
+}
+.rail a.is-active .n { color: var(--accent); }
+.rail__foot {
+  margin-top: auto; padding-top: 26px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-faint); line-height: 1.7;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.rail__foot button {
+  margin-top: 14px;
+  background: transparent; color: var(--ink-faint);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 10px; cursor: pointer;
+  font-family: var(--mono); font-size: 11px;
+  display: flex; gap: 6px; align-items: center; justify-content: center;
+  text-transform: uppercase; letter-spacing: .06em;
+  transition: .2s;
+}
+.rail__foot button:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+/* ---------- main column ---------- */
+main.main {
+  min-width: 0;
+  padding: 0 56px;
+}
+section.section {
+  padding: 92px 0;
+  border-bottom: 1px solid var(--line-soft);
+  max-width: 820px;
+}
+section.section:last-of-type { border-bottom: none; }
+.section--wide { max-width: none; }
+
+/* ---------- type ---------- */
+.kicker {
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--accent);
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 22px;
+}
+.kicker__num {
+  background: var(--accent); color: var(--paper);
+  padding: 2px 8px; border-radius: 3px; font-weight: 500;
+}
+.section h2 {
+  font-family: var(--serif); font-weight: 800;
+  font-size: clamp(32px, 4.6vw, 48px);
+  line-height: 1.08; letter-spacing: -.015em;
+  font-variation-settings: 'SOFT' 40, 'WONK' 1;
+  margin-bottom: 22px;
+  color: var(--ink);
+}
+.section h2 em { font-style: italic; color: var(--accent); }
+.section h3 {
+  font-family: var(--serif); font-weight: 800;
+  font-size: 24px; line-height: 1.25;
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+.section p {
+  margin: 0 0 18px;
+  color: var(--ink-soft);
+}
+.section p strong { color: var(--ink); font-weight: 600; }
+.section p:last-child { margin-bottom: 0; }
+.lead { font-size: 19px; line-height: 1.55; color: var(--ink); }
+code {
+  font-family: var(--mono); font-size: .86em;
+  background: var(--paper-tint);
+  padding: 1.5px 5px; border-radius: 4px;
+  color: var(--accent-deep);
+  border: 1px solid var(--line-soft);
+}
+:root[data-theme="dark"] code { color: var(--accent); }
+
+/* ---------- hero ---------- */
+.hero {
+  padding: 110px 0 90px;
+  max-width: 920px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.hero__eyebrow {
+  font-family: var(--mono); font-size: 12px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink-faint);
+  display: flex; flex-wrap: wrap; gap: 8px 18px;
+  margin-bottom: 28px;
+}
+.hero__tag { color: var(--accent); }
+.hero__tag::before {
+  content: "●"; font-size: 7px; vertical-align: middle; margin-right: 7px;
+}
+.hero__title {
+  font-family: var(--serif); font-weight: 800;
+  font-size: clamp(42px, 6.4vw, 76px);
+  line-height: 1.04; letter-spacing: -.025em;
+  font-variation-settings: 'SOFT' 30, 'WONK' 1;
+  margin-bottom: 28px;
+  color: var(--ink);
+}
+.hero__title em { font-style: italic; color: var(--accent); }
+.hero__stand {
+  font-size: 20px; line-height: 1.6;
+  color: var(--ink-soft);
+  max-width: 660px;
+  margin: 0;
+}
+.hero__scroll {
+  margin-top: 48px;
+  font-family: var(--mono); font-size: 11.5px;
+  letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-faint);
+  display: flex; align-items: center; gap: 10px;
+}
+.hero__scroll-dash {
+  width: 38px; height: 1px; background: var(--ink-faint);
+  position: relative; overflow: hidden;
+}
+.hero__scroll-dash::after {
+  content: ""; position: absolute; inset: 0;
+  width: 14px; background: var(--accent);
+  animation: slide 1.9s infinite ease-in-out;
+}
+@keyframes slide {
+  0% { transform: translateX(-16px); }
+  100% { transform: translateX(40px); }
+}
+
+/* ---------- "Why" gap cards ---------- */
+.gaps {
+  display: flex; flex-direction: column; gap: 14px;
+  margin-top: 32px;
+}
+.gap {
+  display: grid; grid-template-columns: 46px 1fr; gap: 18px;
+  background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+}
+.gap__ic {
+  width: 46px; height: 46px; border-radius: 10px;
+  display: grid; place-items: center;
+  font-size: 20px;
+  background: var(--clay-tint); border: 1px solid var(--clay);
+  color: var(--clay);
+  font-family: var(--mono); font-weight: 500;
+}
+.gap h3 { font-size: 18px; margin-bottom: 3px; }
+.gap p { font-size: 15px; margin: 0; }
+
+/* ---------- principles ---------- */
+.principles {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 13px;
+  margin-top: 28px;
+}
+.principle {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 11px; padding: 18px 19px;
+}
+.principle__t {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ochre); margin-bottom: 6px; font-weight: 500;
+}
+.principle p { font-size: 14px; margin: 0; }
+
+/* ---------- callouts ---------- */
+.callout {
+  display: grid; grid-template-columns: auto 1fr; gap: 13px;
+  background: var(--ochre-tint);
+  border: 1px solid var(--ochre); border-radius: 11px;
+  padding: 15px 17px;
+  margin-top: 18px;
   font-size: 14px;
-  line-height: 1.45;
+  color: var(--ink-soft);
+}
+.callout__ic { font-size: 17px; color: var(--ochre); }
+.callout b { color: var(--accent-deep); }
+:root[data-theme="dark"] .callout b { color: var(--accent); }
+.callout--review {
+  background: var(--clay-tint);
+  border-color: var(--clay);
+}
+.callout--review .callout__ic { color: var(--clay); }
+.callout--question {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+}
+.callout--question .callout__ic { color: var(--accent); }
+
+/* ---------- file chip ---------- */
+.file-chip {
+  display: inline-flex; padding: 2px 7px; font-size: 11.5px;
+  border: 1px solid var(--line-soft); border-radius: 5px;
+  cursor: copy;
+  font-family: var(--mono); color: var(--accent-deep);
+  background: var(--accent-tint);
+  white-space: nowrap;
+}
+:root[data-theme="dark"] .file-chip { color: var(--accent); }
+.file-chip:hover { border-color: var(--accent); }
+
+/* ---------- specifics (collapsible) ---------- */
+details.spec {
+  background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px;
+  margin-top: 16px; overflow: hidden;
+  box-shadow: var(--shadow);
+}
+details.spec summary {
+  cursor: pointer; list-style: none;
+  padding: 17px 22px;
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--mono); font-size: 12.5px;
+  letter-spacing: .04em; text-transform: uppercase;
+  color: var(--ink); font-weight: 500;
+  user-select: none;
+}
+details.spec summary::-webkit-details-marker { display: none; }
+details.spec summary .chev {
+  margin-left: auto; width: 18px; height: 18px;
+  display: grid; place-items: center;
+  transition: transform .3s;
+  color: var(--accent);
+}
+details.spec[open] summary .chev { transform: rotate(90deg); }
+details.spec summary .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--accent);
+}
+.spec__body { padding: 4px 22px 24px; }
+.spec__body ul {
+  list-style: none;
+  display: flex; flex-direction: column; gap: 13px;
+  margin: 6px 0 0;
+}
+.spec__body li {
+  display: grid; grid-template-columns: auto 1fr; gap: 13px;
+  font-size: 14.5px; color: var(--ink-soft);
+}
+.spec__body li b { color: var(--ink); font-weight: 600; }
+.spec__files {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px;
 }
 
-/* ===== Header ===== */
-.pr-header {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--border);
-  gap: 16px;
+/* ---------- meta strip ---------- */
+.meta-strip {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  margin: 22px 0 12px;
 }
-.pr-header__title { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
-.pr-header__meta { display: flex; gap: 6px; flex-wrap: wrap; }
-.pr-header__tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-.pr-header__right button {
-  background: transparent; color: var(--fg); border: 1px solid var(--border);
-  border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 14px;
-}
-.pr-header__right button:hover { border-color: var(--border-hi); }
-
-/* ===== Chips ===== */
 .chip {
-  display: inline-flex; align-items: center; padding: 2px 8px;
-  border: 1px solid var(--border); border-radius: 4px;
-  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; font-size: 12px;
-  color: var(--fg);
+  display: inline-flex; align-items: center;
+  padding: 3px 9px;
+  border: 1px solid var(--line-soft); border-radius: 5px;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink-soft);
+  background: var(--surface);
 }
-.chip--muted { color: var(--fg-muted); }
-.chip--arrow { border: 0; padding: 2px 2px; color: var(--fg-muted); }
-.chip--add { color: var(--added); border-color: var(--added); }
-.chip--del { color: var(--removed); border-color: var(--removed); }
-.chip--tag { background: var(--bg-elev); }
+.chip--accent { color: var(--accent); border-color: var(--accent); background: var(--accent-tint); }
+.chip--ochre  { color: var(--ochre); border-color: var(--ochre); background: var(--ochre-tint); }
+.chip--clay   { color: var(--clay); border-color: var(--clay); background: var(--clay-tint); }
+.chip--add    { color: var(--added); border-color: var(--added-border); }
+.chip--del    { color: var(--removed); border-color: var(--removed-border); }
 
-/* ===== Sections ===== */
-.pr-main { padding: 24px; max-width: 1400px; margin: 0 auto; }
-.pr-section { margin-bottom: 40px; }
-.pr-section__title {
-  font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
-  color: var(--fg-muted); margin: 0 0 12px; font-weight: 600;
+/* ---------- arch legend ---------- */
+.arch-legend {
+  display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: 10px 16px;
+  margin: 20px 0 0;
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink-soft);
+}
+.arch-legend__label {
+  color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: .08em;
+  font-size: 11px;
+}
+.arch-legend__item { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.arch-legend__chip {
+  display: inline-block; width: 22px; height: 14px; border-radius: 3px;
+}
+.arch-legend__chip--added {
+  background: #b3d4c4; border: 3px solid #0d4234;
+}
+.arch-legend__chip--changed {
+  background: #b8c8e1; border: 3px solid #1c3a6b;
+}
+.arch-legend__chip--context {
+  background: #ece5d5; border: 2px dashed #5b5347;
+}
+:root[data-theme="dark"] .arch-legend__chip--added {
+  background: #1f4f3a; border-color: #3fb950;
+}
+:root[data-theme="dark"] .arch-legend__chip--changed {
+  background: #1f3a5a; border-color: #58a6ff;
+}
+:root[data-theme="dark"] .arch-legend__chip--context {
+  background: #21262d; border-color: #8b949e;
+}
+.arch-legend__edges {
+  margin-left: auto;
+  color: var(--ink-faint);
+  font-size: 11.5px;
 }
 
-/* ===== Summary ===== */
-.summary-bullets { margin: 0; padding-left: 20px; }
-.summary-bullets li { margin: 4px 0; }
+/* ---------- Mermaid (architecture) ---------- */
+.mmd-wrap {
+  position: relative;
+  border: 1px solid var(--line); border-radius: 12px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0)
+    0 0 / 24px 24px var(--surface);
+  margin-top: 26px;
+  overflow: hidden;
+  min-height: 540px;
+  box-shadow: var(--shadow);
+}
+.mmd-inner {
+  position: relative;
+  width: 100%; height: 760px;
+  overflow: hidden;
+  cursor: grab;
+}
+.mmd-inner:active { cursor: grabbing; }
+.mmd-inner .mermaid {
+  transform-origin: 0 0;
+  padding: 24px;
+  white-space: normal;
+}
+.mmd-inner svg {
+  background: transparent !important;
+  display: block;
+}
+.mmd-inner svg .node rect,
+.mmd-inner svg .node polygon,
+.mmd-inner svg .node circle,
+.mmd-inner svg .node ellipse {
+  rx: 8; ry: 8;
+}
+.mmd-inner svg .nodeLabel,
+.mmd-inner svg .label {
+  font-family: var(--mono) !important;
+  font-size: 13px;
+}
+/* Subgraph cluster boxes — these need stronger contrast than the default
+   Mermaid theme provides, otherwise the kind grouping (UI / Services /
+   Data / etc.) gets lost against the dotted-grid canvas background. */
+.mmd-inner svg .cluster rect {
+  rx: 12; ry: 12;
+  fill: rgba(0,0,0,0.045) !important;
+  stroke: var(--ink-soft) !important;
+  stroke-width: 1.5px !important;
+  stroke-dasharray: 6 6;
+}
+:root[data-theme="dark"] .mmd-inner svg .cluster rect {
+  fill: rgba(255,255,255,0.04) !important;
+  stroke: #8b949e !important;
+  stroke-width: 1.5px !important;
+}
+.mmd-inner svg .cluster text {
+  font-family: var(--mono) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  fill: var(--ink) !important;
+}
+/* Edge labels — plain SVG text. No rect, no halo, no stroke trick. Text
+   sits on the line; that's the convention in the reference. */
+.mmd-inner svg .edgeLabel,
+.mmd-inner svg text.edgeLabel,
+.mmd-inner svg .edgeLabel text {
+  font-family: var(--mono) !important;
+  font-size: 11.5px !important;
+  fill: var(--ink) !important;
+  stroke: none !important;
+}
+.mmd-inner svg .labelBkg,
+.mmd-inner svg .edgeLabel rect,
+.mmd-inner svg .edgeLabels rect {
+  fill: transparent !important;
+  stroke: none !important;
+}
+.mmd-inner svg .node[id*="n_"] rect,
+.mmd-inner svg .node[id*="n_"] polygon {
+  cursor: pointer;
+}
+.mmd-hint {
+  position: absolute; top: 12px; left: 16px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: .04em; text-transform: uppercase;
+  pointer-events: none; z-index: 3;
+  opacity: .75;
+}
 
-/* ===== Canvas (panzoom viewport) ===== */
+/* ---------- canvas (database + flow diagrams) ---------- */
 .canvas {
   position: relative;
-  height: 560px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
+  height: 720px;
+  border: 1px solid var(--line); border-radius: 12px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 1px 1px, var(--border) 1px, transparent 0)
-    0 0 / 24px 24px var(--bg);
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0)
+    0 0 / 24px 24px var(--surface);
+  margin-top: 26px;
+  box-shadow: var(--shadow);
 }
 .canvas__scene {
   position: absolute; top: 0; left: 0; transform-origin: 0 0;
-  width: 4000px; height: 4000px;
 }
 .canvas__controls {
-  position: absolute; bottom: 12px; right: 12px; display: flex; gap: 4px;
-  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px;
-  padding: 4px; z-index: 2;
+  position: absolute; bottom: 12px; right: 12px;
+  display: flex; gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line); border-radius: 6px;
+  padding: 4px;
+  z-index: 2;
+  box-shadow: var(--shadow);
 }
 .canvas__controls button {
-  background: transparent; color: var(--fg); border: 0; padding: 4px 8px;
-  cursor: pointer; font-size: 12px; border-radius: 2px;
+  background: transparent; color: var(--ink-soft); border: 0;
+  padding: 4px 8px;
+  cursor: pointer; font-size: 12px; border-radius: 4px;
 }
-.canvas__controls button:hover { background: var(--border); }
-.canvas__edges {
-  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  pointer-events: none;
-}
-.canvas__edges path { stroke: var(--border-hi); stroke-width: 1.5; fill: none; }
-.canvas__edges path.is-async { stroke-dasharray: 6 4; }
-.canvas__edges path.is-dimmed { opacity: 0.4; }
+.canvas__controls button:hover { background: var(--line); color: var(--ink); }
 
-/* ===== UML / ER cards ===== */
-.node {
-  position: absolute;
-  min-width: 200px; max-width: 280px;
-  background: var(--bg-elev);
-  border: 1px solid var(--border); border-radius: 4px;
-  cursor: pointer; transition: transform 100ms ease, border-color 100ms ease;
-  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+.canvas__hint {
+  position: absolute; top: 12px; left: 12px;
+  font-family: var(--mono); font-size: 11px;
+  color: var(--ink-faint);
+  letter-spacing: .04em; text-transform: uppercase;
+  pointer-events: none; opacity: .8;
+  z-index: 2;
 }
-.node:hover { transform: translateY(-2px); border-color: var(--border-hi); }
+
+.canvas__edges {
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.canvas__edges path {
+  stroke: var(--ink-faint); stroke-width: 1.6; fill: none;
+}
+.canvas__edges path.is-async   { stroke-dasharray: 6 4; }
+.canvas__edges path.is-data    { stroke: var(--changed); }
+.canvas__edges path.is-added   { stroke: var(--added); }
+.canvas__edges path.is-dimmed  { opacity: 0.35; stroke-dasharray: 3 3; }
+.canvas__edges path.is-focus-dim { opacity: .08; transition: opacity .12s ease; }
+.canvas__edges .edge-arrow { fill: var(--ink-faint); }
+.canvas__edges .edge-label {
+  fill: var(--ink); font-size: 11.5px;
+  font-family: var(--mono);
+  paint-order: stroke;
+  stroke: var(--surface); stroke-width: 4px;
+}
+
+/* ---------- UML / ER cards ----------
+   Selector scoped to div.node so it doesn't collide with Mermaid's
+   <g class="node"> elements in the architecture diagram, which already
+   carry a `transform="translate(X,Y)"` attribute. A bare .node:hover
+   transform would stack on top and produce jitter as the user mouses
+   over Mermaid boxes. */
+div.node {
+  position: absolute;
+  min-width: 220px; max-width: 320px;
+  background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px;
+  cursor: pointer;
+  transition: transform 100ms ease, border-color 100ms ease, box-shadow 100ms ease;
+  font-family: var(--mono);
+  box-shadow: var(--shadow);
+}
+div.node:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-lift);
+}
+div.node.is-dimmed { opacity: 0.3; transition: opacity .12s ease; }
+div.node.is-dragging {
+  cursor: grabbing;
+  box-shadow: var(--shadow-lift);
+  z-index: 5;
+  user-select: none;
+  transition: none;  /* skip the hover-lift transition during a drag */
+}
+div.node--draggable { cursor: grab; }
+div.node--draggable:hover { cursor: grab; }
+div.node--draggable.is-dragging { cursor: grabbing; }
 .node__head {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-bottom: 1px solid var(--border);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
   font-size: 13px; font-weight: 600;
+  color: var(--ink);
 }
-.node__kind { font-size: 11px; color: var(--fg-muted); }
-.node__body { padding: 8px 10px; font-size: 12px; color: var(--fg-muted); }
-.node__body ul { margin: 0; padding-left: 16px; }
-.node__body li { margin: 2px 0; }
+.node__kind {
+  font-size: 10px; color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: .04em;
+  background: var(--paper-tint);
+  padding: 2px 6px; border-radius: 4px;
+  border: 1px solid var(--line-soft);
+}
+.node__body {
+  padding: 8px 12px; font-size: 12.5px;
+  color: var(--ink-soft);
+}
+.node__body ul { margin: 0; padding-left: 16px; list-style: disc; }
+.node__body li { margin: 3px 0; }
 
-.node.is-added   { border-color: var(--added); }
-.node.is-changed { border-color: var(--changed); }
-.node.is-removed { border-color: var(--removed); border-style: dashed; }
-.node.is-context { border-color: var(--border); }
+.node.is-added   { border-color: var(--added-border); }
+.node.is-added .node__head   { background: var(--added-tint); }
+.node.is-changed { border-color: var(--changed-border); }
+.node.is-changed .node__head { background: var(--changed-tint); }
+.node.is-removed { border-color: var(--removed-border); border-style: dashed; }
+.node.is-removed .node__head { background: var(--removed-tint); }
+.node.is-context { border-color: var(--line); }
 
 .status-chip {
-  display: inline-flex; padding: 1px 6px; border-radius: 2px;
-  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  display: inline-flex;
+  padding: 1px 7px; border-radius: 4px;
+  font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em;
   margin-left: auto;
+  font-family: var(--mono);
 }
-.status-chip.is-added   { background: rgba(63,185,80,0.15); color: var(--added); }
-.status-chip.is-changed { background: rgba(88,166,255,0.15); color: var(--changed); }
-.status-chip.is-removed { background: rgba(248,81,73,0.15); color: var(--removed); }
+.status-chip.is-added   { background: var(--added-tint); color: var(--added); }
+.status-chip.is-changed { background: var(--changed-tint); color: var(--changed); }
+.status-chip.is-removed { background: var(--removed-tint); color: var(--removed); }
 
-/* ===== ER field rows ===== */
+/* ---------- ER field rows ---------- */
 .field-row {
   display: grid; grid-template-columns: 1fr auto auto;
-  gap: 6px; padding: 4px 10px; font-size: 12px;
+  gap: 8px; padding: 5px 12px;
+  font-size: 12px;
   border-left: 3px solid transparent;
+  color: var(--ink-soft);
 }
-.field-row + .field-row { border-top: 1px solid var(--border); }
-.field-row__name { color: var(--fg); }
-.field-row__type { color: var(--fg-muted); }
-.field-row.is-added   { border-left-color: var(--added); }
-.field-row.is-changed { border-left-color: var(--changed); }
-.field-row.is-removed { border-left-color: var(--removed); }
+.field-row + .field-row { border-top: 1px solid var(--line-soft); }
+.field-row__name { color: var(--ink); }
+.field-row__type { color: var(--ink-faint); }
+.field-row.is-added   { border-left-color: var(--added); background: var(--added-tint); }
+.field-row.is-changed { border-left-color: var(--changed); background: var(--changed-tint); }
+.field-row.is-removed { border-left-color: var(--removed); background: var(--removed-tint); }
 .field-row.is-privacy { box-shadow: inset 3px 0 0 var(--privacy); }
 
-/* ===== Flow lanes ===== */
-.flow-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0; }
-.flow-lane { border-right: 1px dashed var(--border); padding: 8px; min-height: 360px; }
-.flow-lane:last-child { border-right: 0; }
-.flow-lane__header { font-size: 12px; color: var(--fg-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
-.flow-step { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin: 6px 0; cursor: pointer; font-size: 12px; }
-.flow-step.is-changed { border-color: var(--changed); }
-
-/* ===== Prose cards (observations, risk, open questions) ===== */
-.prose-card {
-  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 4px;
-  padding: 12px 14px; margin: 8px 0;
+/* ---------- Flow (UML sequence diagram) ---------- */
+.flow-seq {
+  border: 1px solid var(--line); border-radius: 12px;
+  background:
+    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0)
+    0 0 / 24px 24px var(--surface);
+  margin-top: 26px;
+  overflow-x: auto;
+  box-shadow: var(--shadow);
 }
-.prose-card__title { font-size: 13px; font-weight: 600; margin: 0 0 4px; display: flex; justify-content: space-between; gap: 8px; }
-.prose-card__body { color: var(--fg-muted); font-size: 13px; margin: 4px 0 0; }
-.prose-card__files { margin-top: 8px; display: flex; gap: 4px; flex-wrap: wrap; }
-.file-chip {
-  display: inline-flex; padding: 2px 6px; font-size: 11px;
-  border: 1px solid var(--border); border-radius: 2px; cursor: copy;
-  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; color: var(--fg-muted);
+.flow-seq__actors {
+  position: relative; height: 64px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-tint);
 }
-.file-chip:hover { border-color: var(--border-hi); color: var(--fg); }
+.flow-actor {
+  position: absolute; top: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--ink-faint); border-radius: 6px;
+  padding: 8px 14px;
+  font-family: var(--mono); font-size: 12px;
+  box-shadow: var(--shadow);
+}
+.flow-actor__kind {
+  font-size: 9.5px; color: var(--ink-faint);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.flow-actor__label {
+  font-weight: 600; color: var(--ink);
+  margin-top: 2px;
+}
+.flow-seq__stage { position: relative; }
+.flow-seq__lifelines, .flow-seq__messages {
+  position: absolute; top: 0; left: 0;
+  overflow: visible;
+}
+.flow-seq__lifelines { pointer-events: none; }
+.flow-seq__messages { pointer-events: auto; }
+.flow-seq__messages rect { pointer-events: auto; }
+.flow-seq__lifeline {
+  stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 4 6;
+}
+.flow-seq__msg {
+  stroke: var(--ink-soft); stroke-width: 1.6; fill: none;
+}
+.flow-seq__msg.is-changed {
+  stroke: var(--changed); stroke-width: 2;
+}
+.flow-seq__label {
+  fill: var(--ink); font-size: 12.5px;
+  font-family: var(--mono);
+  paint-order: stroke;
+  stroke: var(--surface); stroke-width: 4px;
+}
+.flow-seq__num {
+  fill: var(--accent); font-size: 10px; font-weight: 500;
+  font-family: var(--mono);
+  paint-order: stroke;
+  stroke: var(--surface); stroke-width: 3px;
+}
 
-.kind-chip { font-size: 10px; padding: 1px 6px; border-radius: 2px; border: 1px solid var(--border); color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+/* ---------- timeline ---------- */
+.timeline {
+  display: flex; flex-direction: column; gap: 0;
+  margin-top: 28px;
+  border-left: 1px solid var(--line);
+  padding-left: 0;
+}
+.tl {
+  display: grid; grid-template-columns: 26px 1fr; gap: 16px;
+  padding: 0 0 22px;
+}
+.tl:last-child { padding-bottom: 0; }
+.tl__pip {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--paper); border: 2px solid var(--accent);
+  margin-left: -7px; margin-top: 4px;
+}
+.tl--ochre .tl__pip { border-color: var(--ochre); }
+.tl h3 { font-size: 17px; margin-bottom: 2px; }
+.tl p { font-size: 14px; margin: 0; }
 
-/* ===== Detail panel ===== */
+/* ---------- detail panel ---------- */
 .detail-panel {
   position: fixed; top: 0; right: 0; bottom: 0;
   width: min(480px, 92vw);
-  background: var(--bg-elev); border-left: 1px solid var(--border);
-  padding: 20px 24px; overflow-y: auto; z-index: 50;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  padding: 28px 30px;
+  overflow-y: auto;
+  z-index: 50;
   transform: translateX(0); transition: transform 180ms ease;
+  box-shadow: var(--shadow-lift);
 }
 .detail-panel[hidden] { display: block; transform: translateX(100%); }
 .detail-panel__close {
-  position: absolute; top: 12px; right: 12px;
-  background: transparent; color: var(--fg-muted); border: 0; cursor: pointer;
-  font-size: 20px; line-height: 1;
+  position: absolute; top: 16px; right: 16px;
+  background: transparent; color: var(--ink-faint); border: 0;
+  cursor: pointer; font-size: 22px; line-height: 1;
 }
-.detail-panel__close:hover { color: var(--fg); }
-.detail-panel__body h3 { margin: 0 0 4px; font-size: 15px; }
-.detail-panel__body h4 { margin: 16px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--fg-muted); }
-.detail-panel__body p { margin: 4px 0; }
-.detail-panel__body ul { margin: 4px 0; padding-left: 18px; }
+.detail-panel__close:hover { color: var(--ink); }
+.detail-panel__body h3 {
+  font-family: var(--serif); font-weight: 500;
+  margin: 0 0 6px; font-size: 22px;
+  color: var(--ink);
+}
+.detail-panel__body h4 {
+  font-family: var(--mono); margin: 18px 0 6px;
+  font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ink-faint); font-weight: 500;
+}
+.detail-panel__body p { margin: 6px 0; color: var(--ink-soft); }
+.detail-panel__body ul { margin: 6px 0; padding-left: 20px; color: var(--ink-soft); }
 
-/* ===== Minimap ===== */
-.minimap {
-  position: absolute; top: 12px; right: 12px;
-  width: 160px; height: 100px;
-  border: 1px solid var(--border); background: var(--bg-elev);
-  z-index: 2; opacity: 0.85;
+/* ---------- footer / PR card ---------- */
+.footer {
+  padding: 60px 0 90px;
+  max-width: 820px;
+}
+.pr-card {
+  background: var(--accent-deep);
+  border-radius: 14px;
+  padding: 32px 32px;
+  color: var(--paper);
+  box-shadow: var(--shadow-lift);
+}
+:root[data-theme="dark"] .pr-card { background: var(--accent-tint); border: 1px solid var(--accent); }
+.pr-card__k {
+  font-family: var(--mono); font-size: 11px;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent-tint);
+  margin-bottom: 10px;
+}
+:root[data-theme="dark"] .pr-card__k { color: var(--accent); }
+.pr-card__h {
+  color: var(--paper);
+  font-family: var(--serif); font-weight: 500;
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+:root[data-theme="dark"] .pr-card__h { color: var(--ink); }
+.pr-card__p {
+  font-size: 14.5px; line-height: 1.55;
+  color: var(--accent-tint);
+  margin-bottom: 18px;
+}
+:root[data-theme="dark"] .pr-card__p { color: var(--ink-soft); }
+.pr-card__a {
+  display: inline-flex; align-items: center; gap: 9px;
+  background: var(--ochre); color: var(--accent-deep);
+  font-family: var(--mono); font-size: 13px; font-weight: 500;
+  padding: 10px 18px; border-radius: 8px;
+  text-decoration: none;
+  transition: .2s;
+}
+.pr-card__a:hover { transform: translateY(-2px); }
+
+/* ---------- responsive ---------- */
+@media (max-width: 980px) {
+  .shell { grid-template-columns: 1fr; }
+  nav.rail { display: none; }
+  main.main { padding: 0 24px; }
+  .hero, .section, .footer { max-width: none; }
+  .principles { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
 }
 </style>
 </head>
 <body>
-  <header class="pr-header">
-    <div class="pr-header__left">
-      <h1 class="pr-header__title" data-bind="meta.title"></h1>
-      <div class="pr-header__meta">
-        <span class="chip" data-bind="meta.base"></span>
-        <span class="chip chip--arrow">→</span>
-        <span class="chip" data-bind="meta.head"></span>
-        <span class="chip chip--muted" data-bind="meta.files_changed" data-suffix=" files"></span>
-        <span class="chip chip--add" data-bind="meta.additions" data-prefix="+"></span>
-        <span class="chip chip--del" data-bind="meta.deletions" data-prefix="−"></span>
-      </div>
-      <div class="pr-header__tags" data-list="meta.pr_type_tags" data-item-class="chip chip--tag"></div>
-    </div>
-    <div class="pr-header__right">
-      <button type="button" data-theme-toggle aria-label="Toggle theme">◐</button>
-    </div>
-  </header>
+  <div class="progress" data-progress></div>
 
-  <main class="pr-main">
-    <!-- Section renderers mount themselves in here based on which keys are present in the spec. -->
-  </main>
+  <div class="shell">
+    <nav class="rail">
+      <div class="rail__brand">
+        <b data-bind="meta.head"></b>
+        <span data-rail-pr></span>
+      </div>
+      <div class="rail__title" data-bind="meta.title"></div>
+      <ol data-nav>
+        <!-- nav links injected by JS -->
+      </ol>
+      <div class="rail__foot">
+        <div data-bind="meta.base" data-prefix="base · "></div>
+        <div data-bind="meta.files_changed" data-suffix=" files changed"></div>
+        <button type="button" data-theme-toggle aria-label="Toggle theme">
+          <span class="theme-toggle__lbl">theme</span>
+          <span class="theme-toggle__icon">◐</span>
+        </button>
+      </div>
+    </nav>
+
+    <main class="main">
+      <header class="hero" id="hero">
+        <div class="hero__eyebrow">
+          <span data-bind="meta.head" data-prefix="branch / "></span>
+          <span class="hero__tag" data-hero-pr></span>
+          <span data-bind="meta.title"></span>
+        </div>
+        <h1 class="hero__title" data-hero-title>PR overview</h1>
+        <p class="hero__stand" data-hero-stand></p>
+        <div class="hero__scroll">
+          <span class="hero__scroll-dash"></span> scroll to read
+        </div>
+      </header>
+
+      <div class="sections" data-sections>
+        <!-- Section bodies mount here. -->
+      </div>
+
+      <footer class="footer">
+        <div class="pr-card">
+          <div class="pr-card__k">ready for review</div>
+          <h3 class="pr-card__h" data-bind="meta.title"></h3>
+          <p class="pr-card__p" data-footer-stand></p>
+          <a class="pr-card__a" data-footer-link href="#">View PR →</a>
+        </div>
+      </footer>
+    </main>
+  </div>
 
   <aside class="detail-panel" data-detail-panel hidden>
     <button type="button" class="detail-panel__close" data-detail-close aria-label="Close panel">×</button>
@@ -255,6 +944,10 @@ body {
 
   const data = window.__PR_OVERVIEW_DATA__;
   if (!data) return;
+
+  // Cross-renderer namespace. Initialised early so theme-toggle and section
+  // renderers can register hooks before the first render finishes.
+  window.__pro = window.__pro || { themeChangeHandlers: [] };
 
   // ---------- helpers ----------
   const pick = (obj, path) => path.split('.').reduce((a, k) => (a == null ? a : a[k]), obj);
@@ -275,20 +968,21 @@ body {
   const escapeHTML = (s) => String(s).replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
+  const svg = (tag, attrs = {}) => {
+    const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v != null) node.setAttribute(k, v);
+    }
+    return node;
+  };
 
-  // ---------- header bindings ----------
+  // ---------- meta / data-bind / data-list ----------
   document.querySelectorAll('[data-bind]').forEach((node) => {
     const v = pick(data, node.getAttribute('data-bind'));
     if (v == null) return;
     const prefix = node.getAttribute('data-prefix') || '';
     const suffix = node.getAttribute('data-suffix') || '';
     node.textContent = `${prefix}${v}${suffix}`;
-  });
-  document.querySelectorAll('[data-list]').forEach((node) => {
-    const arr = pick(data, node.getAttribute('data-list'));
-    if (!Array.isArray(arr)) return;
-    const cls = node.getAttribute('data-item-class') || '';
-    node.innerHTML = arr.map((v) => `<span class="${cls}">${escapeHTML(v)}</span>`).join('');
   });
 
   // ---------- theme toggle ----------
@@ -298,10 +992,134 @@ body {
   } catch (_) {}
   document.querySelector('[data-theme-toggle]')?.addEventListener('click', () => {
     const root = document.documentElement;
-    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    const next = root.getAttribute('data-theme') === 'paper' ? 'dark' : 'paper';
     root.setAttribute('data-theme', next);
     try { localStorage.setItem('pr-overview.theme', next); } catch (_) {}
+    // Mermaid bakes its theme variables + classDefs into the rendered SVG, so
+    // a toggle has to re-render the diagram. The architecture renderer
+    // registers a callback here for that purpose.
+    (window.__pro.themeChangeHandlers || []).forEach((fn) => { try { fn(next); } catch (_) {} });
   });
+
+  // ---------- hero + footer ----------
+  const heroTitle = document.querySelector('[data-hero-title]');
+  if (heroTitle) heroTitle.textContent = data.meta.title;
+  const heroStand = document.querySelector('[data-hero-stand]');
+  if (heroStand && data.summary?.bullets?.length) {
+    heroStand.textContent = data.summary.bullets[0];
+  }
+  const footerStand = document.querySelector('[data-footer-stand]');
+  if (footerStand && data.summary?.bullets?.length) {
+    const tail = data.summary.bullets.slice(0, 2).join(' ');
+    footerStand.textContent = tail;
+  }
+  const prLink = document.querySelector('[data-footer-link]');
+  if (prLink) {
+    const href = data.meta.pr_url || '#';
+    prLink.setAttribute('href', href);
+    if (!data.meta.pr_url) {
+      prLink.textContent = 'View diff →';
+      prLink.style.pointerEvents = 'none';
+      prLink.style.opacity = '0.6';
+    }
+  }
+  const railPr = document.querySelector('[data-rail-pr]');
+  if (railPr && data.meta.pr_url) {
+    const m = data.meta.pr_url.match(/\/pull\/(\d+)/);
+    if (m) railPr.textContent = '· PR #' + m[1];
+  }
+  const heroPr = document.querySelector('[data-hero-pr]');
+  if (heroPr) {
+    if (data.meta.pr_url) {
+      const m = data.meta.pr_url.match(/\/pull\/(\d+)/);
+      heroPr.textContent = m ? 'PR #' + m[1] : 'PR';
+    } else {
+      heroPr.textContent = data.meta.head;
+      heroPr.classList.remove('hero__tag');
+    }
+  }
+
+  // ---------- section mount registry ----------
+  const main = document.querySelector('[data-sections]');
+  const RENDERERS = {
+    summary:           { label: 'Why this exists',  render: renderWhy },
+    architecture:      { label: 'The big picture',  render: renderArchitecture },
+    flow:              { label: 'How it flows',     render: renderFlow },
+    database:          { label: 'Database changes', render: renderDatabase },
+    code_observations: { label: 'Caught in review', render: renderCodeObservations },
+    risk_rollout:      { label: 'Risk & rollout',   render: renderRiskRollout },
+    open_questions:    { label: 'Open questions',   render: renderOpenQuestions },
+  };
+  // Anchors listed as literals so the test suite can grep for them in
+  // the inlined JS source — and so this stays self-documenting.
+  const ANCHORS = {
+    summary:           'section-summary',
+    architecture:      'section-architecture',
+    flow:              'section-flow',
+    database:          'section-database',
+    code_observations: 'section-code-observations',
+    risk_rollout:      'section-risk-rollout',
+    open_questions:    'section-open-questions',
+  };
+  const ORDER = Object.keys(ANCHORS);
+
+  const navOl = document.querySelector('[data-nav]');
+  let n = 0;
+  ORDER.forEach((key) => {
+    if (!data[key]) return;
+    if (key === 'summary' && !data.summary?.bullets?.length) return;
+    n += 1;
+    const anchor = ANCHORS[key];
+    const meta = RENDERERS[key];
+
+    // nav item
+    if (navOl) {
+      const li = el('li', {}, [
+        el('a', { href: '#' + anchor, 'data-target': anchor }, [
+          el('span', { class: 'n' }, String(n).padStart(2, '0')),
+          el('span', {}, meta.label),
+        ]),
+      ]);
+      navOl.appendChild(li);
+    }
+
+    // section
+    const section = el('section', {
+      class: 'section' + (key === 'architecture' || key === 'flow' || key === 'database' ? ' section--wide' : ''),
+      id: anchor,
+    }, [
+      el('div', { class: 'kicker' }, [
+        el('span', { class: 'kicker__num' }, String(n).padStart(2, '0')),
+        meta.label,
+      ]),
+    ]);
+    main.appendChild(section);
+    try { meta.render(section, data[key]); } catch (err) { console.error(`render ${key} failed`, err); }
+  });
+
+  // ---------- scroll progress + scroll-spy ----------
+  const progress = document.querySelector('[data-progress]');
+  const onScroll = () => {
+    if (progress) {
+      const h = document.documentElement.scrollHeight - window.innerHeight;
+      progress.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+    }
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  const navLinks = Array.from(document.querySelectorAll('[data-target]'));
+  const navByTarget = new Map(navLinks.map((a) => [a.getAttribute('data-target'), a]));
+  const spy = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (e.isIntersecting) {
+        navLinks.forEach((a) => a.classList.remove('is-active'));
+        const a = navByTarget.get(e.target.id);
+        if (a) a.classList.add('is-active');
+      }
+    });
+  }, { rootMargin: '-45% 0px -50% 0px' });
+  document.querySelectorAll('section.section[id]').forEach((s) => spy.observe(s));
 
   // ---------- detail panel ----------
   const panel = document.querySelector('[data-detail-panel]');
@@ -330,181 +1148,736 @@ body {
     setTimeout(() => { chip.textContent = old; }, 700);
   });
 
-  // ---------- section mount registry ----------
-  const main = document.querySelector('.pr-main');
-  const RENDERERS = {
-    summary:           renderSummary,
-    architecture:      renderArchitecture,
-    flow:              renderFlow,
-    database:          renderDatabase,
-    code_observations: renderCodeObservations,
-    risk_rollout:      renderRiskRollout,
-    open_questions:    renderOpenQuestions,
-  };
-  const ORDER = [
-    ['summary',           'section-summary',           'Summary'],
-    ['architecture',      'section-architecture',      'Architecture'],
-    ['flow',              'section-flow',              'Flow'],
-    ['database',          'section-database',          'Database'],
-    ['code_observations', 'section-code-observations', 'Code observations'],
-    ['risk_rollout',      'section-risk-rollout',      'Risk & rollout'],
-    ['open_questions',    'section-open-questions',    'Open questions'],
-  ];
-  for (const [key, anchor, label] of ORDER) {
-    if (!data[key]) continue;
-    const sec = el('section', { id: anchor, class: 'pr-section' }, [
-      el('h2', { class: 'pr-section__title' }, label),
-      el('div', { class: 'pr-section__body' }),
+  // ============================================================
+  // Section renderers
+  // ============================================================
+
+  function renderWhy(host, summary) {
+    const lead = el('p', { class: 'lead' });
+    lead.textContent = data.meta.title + ' — at a glance.';
+    host.appendChild(lead);
+
+    // meta strip with file/insertion/deletion counts + type tags.
+    const strip = el('div', { class: 'meta-strip' }, [
+      el('span', { class: 'chip' }, [el('span', {}, 'base · '), el('b', {}, data.meta.base)]),
+      el('span', { class: 'chip' }, [el('span', {}, '→ '), el('b', {}, data.meta.head)]),
+      el('span', { class: 'chip' }, data.meta.files_changed + ' files'),
+      el('span', { class: 'chip chip--add' }, '+' + data.meta.additions),
+      el('span', { class: 'chip chip--del' }, '−' + data.meta.deletions),
+      ...((data.meta.pr_type_tags || []).map((t) => el('span', { class: 'chip chip--accent' }, t))),
     ]);
-    main.appendChild(sec);
-    try { RENDERERS[key](sec.querySelector('.pr-section__body'), data[key]); } catch (err) {
-      console.error(`render ${key} failed`, err);
+    host.appendChild(strip);
+
+    // Each summary bullet becomes a "gap card".
+    const gaps = el('div', { class: 'gaps' });
+    const icons = ['①', '②', '③', '④', '⑤', '⑥', '⑦'];
+    summary.bullets.forEach((b, i) => {
+      const sentence = String(b).trim();
+      // Use the first noun phrase as the heading, rest as body. Simple split on " — " or first sentence end.
+      let title = sentence, body = '';
+      const dashIdx = sentence.search(/[——:]\s/);
+      if (dashIdx > 0 && dashIdx < 80) {
+        title = sentence.slice(0, dashIdx).trim();
+        body = sentence.slice(dashIdx + 2).trim();
+      } else if (sentence.length > 100) {
+        const periodIdx = sentence.indexOf('. ');
+        if (periodIdx > 0 && periodIdx < 90) {
+          title = sentence.slice(0, periodIdx).trim();
+          body = sentence.slice(periodIdx + 2).trim();
+        }
+      }
+      gaps.appendChild(el('div', { class: 'gap' }, [
+        el('div', { class: 'gap__ic' }, icons[i] || String(i + 1)),
+        el('div', {}, [
+          el('h3', {}, title),
+          body ? el('p', {}, body) : null,
+        ]),
+      ]));
+    });
+    host.appendChild(gaps);
+  }
+
+  // Architecture is rendered via Mermaid flowchart. Subgraphs group nodes by
+  // kind (ui / service / module / datastore / external / job) so the graph
+  // reads as a C4-style container view. Click handlers route to the detail
+  // panel; status colors come from classDef.
+  function renderArchitecture(host, a) {
+    host.appendChild(el('p', {}, [
+      el('span', {}, 'The components this branch touches, grouped by kind and connected by who calls whom. '),
+      el('strong', {}, 'Click any box '),
+      el('span', {}, 'to see its responsibilities, files, and status. The diagram is laid out automatically — use the controls at the bottom right to zoom or fit.'),
+    ]));
+
+    // Inline color legend so the reviewer doesn't need to remember the codes.
+    const legend = el('div', { class: 'arch-legend' }, [
+      el('span', { class: 'arch-legend__label' }, 'Legend'),
+      el('span', { class: 'arch-legend__item' }, [
+        el('span', { class: 'arch-legend__chip arch-legend__chip--added' }),
+        el('span', {}, 'added'),
+      ]),
+      el('span', { class: 'arch-legend__item' }, [
+        el('span', { class: 'arch-legend__chip arch-legend__chip--changed' }),
+        el('span', {}, 'changed'),
+      ]),
+      el('span', { class: 'arch-legend__item' }, [
+        el('span', { class: 'arch-legend__chip arch-legend__chip--context' }),
+        el('span', {}, 'context (unchanged)'),
+      ]),
+      el('span', { class: 'arch-legend__edges' }, 'Edges: solid = sync · dashed = async/data'),
+    ]);
+    host.appendChild(legend);
+
+    const id = 'arch-mmd-' + Math.random().toString(36).slice(2, 9);
+    const wrap = el('div', { class: 'mmd-wrap' });
+    const inner = el('div', { class: 'mmd-inner' });
+    const hint = el('div', { class: 'mmd-hint' }, 'click any node · ctrl+wheel to zoom · drag to pan');
+    const mmdHost = el('pre', { class: 'mermaid', id });
+    inner.appendChild(mmdHost);
+    wrap.appendChild(hint);
+    wrap.appendChild(inner);
+    wrap.appendChild(mmdControls(inner));
+    host.appendChild(wrap);
+
+    // Expose a global handler Mermaid can call from click directives.
+    if (!window.__archDetailFor) {
+      window.__archDetail = {};
+      window.__archDetailFor = (key) => {
+        const entry = window.__archDetail[key];
+        if (!entry) return;
+        openDetail(entry);
+      };
+    }
+    const detailKey = id;
+    window.__archDetail[detailKey] = null; // placeholder; per-node entries set below
+
+    const renderOnce = () => {
+      // textContent reset + clear the data-processed flag so Mermaid will
+      // re-render this element on subsequent runs (it skips already-processed
+      // nodes otherwise).
+      mmdHost.textContent = buildMermaid(a, detailKey);
+      mmdHost.removeAttribute('data-processed');
+      runMermaid(mmdHost, () => wireMermaidInteractions(mmdHost, a, inner));
+    };
+    renderOnce();
+
+    // Re-render on theme toggle: classDef colors and theme variables are baked
+    // into the rendered SVG, so a toggle has to rebuild from source.
+    window.__pro.themeChangeHandlers.push(renderOnce);
+  }
+
+  function buildMermaid(a, detailKey) {
+    const sid = (s) => 'n_' + String(s).replace(/[^a-zA-Z0-9_]/g, '_');
+    const esc = (s) => String(s).replace(/"/g, '#quot;').replace(/[<>]/g, '');
+    // LR (left-right) reads as a system flow: entries on the left, datastores
+    // on the right. Subgraphs group by kind so it stays organised.
+    const lines = ['flowchart LR'];
+
+    // Group nodes by kind for subgraphs. Order kinds so UI/entry points are
+    // on the left, datastores/externals on the right.
+    const KIND_ORDER = ['ui', 'service', 'module', 'job', 'datastore', 'external'];
+    const KIND_LABEL = {
+      ui: 'UI surfaces', service: 'Services', module: 'Modules',
+      job: 'Jobs / Cron', datastore: 'Data', external: 'External',
+    };
+    const grouped = new Map();
+    a.nodes.forEach((n) => {
+      const k = n.kind || 'module';
+      if (!grouped.has(k)) grouped.set(k, []);
+      grouped.get(k).push(n);
+    });
+
+    KIND_ORDER.forEach((kind) => {
+      const nodes = grouped.get(kind);
+      if (!nodes || !nodes.length) return;
+      lines.push(`  subgraph g_${kind}["${esc(KIND_LABEL[kind] || kind)}"]`);
+      lines.push('    direction TB');
+      nodes.forEach((n) => {
+        lines.push(`    ${sid(n.id)}["${esc(n.label)}"]`);
+      });
+      lines.push('  end');
+    });
+
+    // Truncate edge labels to ≤4 words so they always sit cleanly on a
+    // single line. Full label still readable via the SVG <title> set
+    // post-render in wireMermaidInteractions.
+    const truncateLabel = (s) => {
+      const words = String(s).trim().split(/\s+/);
+      return words.length <= 4 ? words.join(' ') : words.slice(0, 3).join(' ') + '…';
+    };
+    a.edges.forEach((e) => {
+      const arrow =
+        e.kind === 'async' ? '-. ' :
+        e.kind === 'data'  ? '== ' :
+                              '-- ';
+      const close =
+        e.kind === 'async' ? ' .-> ' :
+        e.kind === 'data'  ? ' ==> ' :
+                              ' --> ';
+      const label = e.label ? `"${esc(truncateLabel(e.label))}"` : '';
+      lines.push(`  ${sid(e.from)} ${arrow}${label}${close}${sid(e.to)}`);
+    });
+
+    // Status colors via classDef. Boosted contrast so the difference between
+    // added / changed / context is obvious at a glance — thin pale tints
+    // turned out to be unreadable for reviewers scanning the diagram.
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (dark) {
+      lines.push('  classDef added   fill:#1f4f3a,stroke:#3fb950,stroke-width:3px,color:#c8f0d2,font-weight:bold');
+      lines.push('  classDef changed fill:#1f3a5a,stroke:#58a6ff,stroke-width:3px,color:#cfdbed,font-weight:bold');
+      lines.push('  classDef removed fill:#4a2520,stroke:#f85149,stroke-width:3px,color:#f5c6c1,font-weight:bold,stroke-dasharray:5 5');
+      lines.push('  classDef context fill:#21262d,stroke:#8b949e,stroke-width:2px,color:#c9d1d9,stroke-dasharray:4 4');
+    } else {
+      lines.push('  classDef added   fill:#b3d4c4,stroke:#0d4234,stroke-width:3px,color:#0d4234,font-weight:bold');
+      lines.push('  classDef changed fill:#b8c8e1,stroke:#1c3a6b,stroke-width:3px,color:#1c3a6b,font-weight:bold');
+      lines.push('  classDef removed fill:#e6b8a3,stroke:#5a2510,stroke-width:3px,color:#5a2510,font-weight:bold,stroke-dasharray:5 5');
+      lines.push('  classDef context fill:#ece5d5,stroke:#5b5347,stroke-width:2px,color:#211e19,stroke-dasharray:4 4');
+    }
+
+    a.nodes.forEach((n) => {
+      const status = a.details?.[n.id]?.status ?? (n.changed ? 'changed' : 'context');
+      lines.push(`  class ${sid(n.id)} ${status}`);
+    });
+
+    // Click handlers wire each node id to a stored detail-panel entry.
+    a.nodes.forEach((n) => {
+      const key = detailKey + ':' + n.id;
+      lines.push(`  click ${sid(n.id)} call __archDetailFor("${key}")`);
+    });
+
+    return lines.join('\n');
+  }
+
+  function runMermaid(mmdHost, afterRender) {
+    const init = () => {
+      const theme = document.documentElement.getAttribute('data-theme') || 'paper';
+      const paper = theme === 'paper';
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'loose', // needed for click call directives
+        // htmlLabels:false → labels are real SVG <text>, which means we can
+        // use paint-order:stroke to mask the edge line where a label sits.
+        // HTML labels (the default) sit in a foreignObject above the line,
+        // so no text-shadow / background trick can actually cut the line.
+        flowchart: { htmlLabels: false, curve: 'basis', useMaxWidth: false, nodeSpacing: 30, rankSpacing: 55, padding: 12 },
+        theme: 'base',
+        themeVariables: paper ? {
+          fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',
+          background: '#fbf9f3',
+          primaryColor: '#fbf9f3',
+          primaryBorderColor: '#ddd4bf',
+          primaryTextColor: '#211e19',
+          lineColor: '#5b5347',
+          secondaryColor: '#f0e6cf',
+          tertiaryColor: '#e3ece6',
+          // Cluster contrast: pale fill vs ink-soft border so subgraph groups
+          // read clearly without competing with the node colors.
+          clusterBkg: 'rgba(0,0,0,0.045)',
+          clusterBorder: '#5b5347',
+          edgeLabelBackground: 'transparent',
+        } : {
+          fontFamily: 'IBM Plex Mono, ui-monospace, Menlo, monospace',
+          background: '#161b22',
+          primaryColor: '#161b22',
+          primaryBorderColor: '#30363d',
+          primaryTextColor: '#e6edf3',
+          lineColor: '#c9d1d9',
+          secondaryColor: '#21262d',
+          tertiaryColor: 'rgba(63,185,80,0.15)',
+          clusterBkg: 'rgba(255,255,255,0.04)',
+          clusterBorder: '#8b949e',
+          edgeLabelBackground: 'transparent',
+        },
+      });
+      window.mermaid.run({ nodes: [mmdHost] }).then(afterRender);
+    };
+    if (window.mermaid) init();
+    else {
+      const wait = () => window.mermaid ? init() : setTimeout(wait, 30);
+      wait();
     }
   }
 
-  // ---------- canvas (panzoom + edges) ----------
-  function mountCanvas(parent) {
-    const canvas = el('div', { class: 'canvas' });
-    const scene = el('div', { class: 'canvas__scene' });
-    const edges = el('svg', { class: 'canvas__edges', xmlns: 'http://www.w3.org/2000/svg' });
+  function wireMermaidInteractions(mmdHost, a, scrollWrap) {
+    // Store per-node detail HTML keyed by `${graphId}:${nodeId}` so the
+    // Mermaid-generated click directives can find them.
+    a.nodes.forEach((n) => {
+      const d = a.details?.[n.id];
+      const files = (d?.files ?? []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
+      const resp  = (d?.responsibilities ?? []).map((r) => `<li>${escapeHTML(r)}</li>`).join('');
+      const status = d?.status ?? (n.changed ? 'changed' : 'context');
+      window.__archDetail[mmdHost.id + ':' + n.id] = `
+        <h3>${escapeHTML(n.label)}</h3>
+        <p>
+          <span class="chip">${escapeHTML(n.kind || 'module')}</span>
+          ${status !== 'context' ? `<span class="status-chip is-${status}" style="margin-left:6px">${status}</span>` : ''}
+        </p>
+        ${d?.summary ? `<p>${escapeHTML(d.summary)}</p>` : ''}
+        ${resp ? `<h4>Responsibilities</h4><ul>${resp}</ul>` : ''}
+        ${files ? `<h4>Files</h4><div class="spec__files">${files}</div>` : ''}
+      `;
+    });
+
+    // Pin the SVG element to its viewBox dimensions in CSS pixels so the
+    // browser doesn't pre-shrink content. Panzoom is then the ONLY scaler.
+    const svgEl = mmdHost.querySelector('svg');
+    if (!svgEl) return;
+    const vbAttr = svgEl.getAttribute('viewBox');
+    if (vbAttr) {
+      const [, , vbW, vbH] = vbAttr.split(/\s+/).map(Number);
+      if (vbW && vbH) {
+        svgEl.style.width  = vbW + 'px';
+        svgEl.style.height = vbH + 'px';
+      }
+    }
+    svgEl.style.maxWidth = 'none';
+    svgEl.style.display = 'block';
+
+    // Subgraph cluster titles ("UI surfaces", "Services", etc.) render at
+    // exactly the rect top, so the dashed border passes through the text.
+    // Float them ABOVE the box (negative y) so the title acts like a small
+    // caption sitting above the dashed border, with a clear gap. Shifting
+    // them DOWN would push the title into a node when the subgraph only
+    // has one node directly under it.
+    svgEl.querySelectorAll('g.cluster-label').forEach((g) => {
+      if (g.dataset.prShifted) return;
+      const cur = g.getAttribute('transform') || '';
+      g.setAttribute('transform', cur + ' translate(0,-15)');
+      g.dataset.prShifted = '1';
+    });
+
+    // Lift each edge label above its line by translating the wrapper <g>.
+    // Do NOT add per-text dy — Mermaid puts each word on its own <text>
+    // sibling, so per-element dy would stack them into a staircase.
+    svgEl.querySelectorAll('g.edgeLabel').forEach((g) => {
+      if (g.dataset.prLifted) return; // idempotent across theme re-renders
+      const cur = g.getAttribute('transform') || '';
+      g.setAttribute('transform', cur + ' translate(0,-12)');
+      g.dataset.prLifted = '1';
+    });
+    // Expose the full label as <title> on the rendered text so the
+    // truncated 4-word version still surfaces the original on hover.
+    svgEl.querySelectorAll('g.edgeLabel').forEach((g) => {
+      const text = (g.textContent || '').trim();
+      if (!text) return;
+      const original = a.edges.find((e) => e.label && (
+        e.label === text || (e.label.length > text.length && text.endsWith('…'))
+      ))?.label;
+      if (original && original !== text && !g.querySelector('title')) {
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = original;
+        g.appendChild(title);
+      }
+    });
+
+    if (typeof window.panzoom === 'function') {
+      const pz = window.panzoom(svgEl, {
+        smoothScroll: false,
+        minZoom: 0.3, maxZoom: 4,
+        beforeWheel: (e) => !e.ctrlKey && !e.metaKey,
+        // Yield to clicks on nodes (open detail) and to drags on cluster
+        // chrome (move the whole subgraph).
+        beforeMouseDown: (e) =>
+          !!e.target.closest?.('.node') ||
+          !!e.target.closest?.('g.cluster'),
+      });
+      scrollWrap._pz = pz;
+      requestAnimationFrame(() => fitMermaid(pz, svgEl, scrollWrap));
+    }
+
+    // Wire drag on each cluster so reviewers can rearrange the layout.
+    wireClusterDrag(svgEl, a);
+  }
+
+  // Make Mermaid g.cluster elements draggable. Mermaid v11 keeps cluster
+  // rects in one <g> and nodes in a SIBLING <g class="nodes"> — so the
+  // cluster transform alone doesn't move the contained nodes. We resolve
+  // each cluster's members from the spec (cluster `g_<kind>` ↔ nodes with
+  // node.kind === kind) and translate the cluster rect + every member node
+  // together. After the drag, we redraw edges as straight orthogonal paths
+  // since Mermaid's pre-computed bezier curves were baked to the original
+  // positions.
+  function wireClusterDrag(svgEl, a) {
+    const edges = a.edges;
+
+    // Build cluster → member-node-id map from the spec.
+    const KIND_ORDER = ['ui', 'service', 'module', 'job', 'datastore', 'external'];
+    const sid = (s) => 'n_' + String(s).replace(/[^a-zA-Z0-9_]/g, '_');
+    const clusterMembers = new Map(); // clusterDomId -> [memberSid, ...]
+    KIND_ORDER.forEach((kind) => {
+      const members = a.nodes
+        .filter((n) => (n.kind || 'module') === kind)
+        .map((n) => sid(n.id));
+      if (members.length) clusterMembers.set('g_' + kind, members);
+    });
+    // Tag every rendered edge with the source/target ids the spec used,
+    // matching them by emission order (Mermaid renders edges in declaration
+    // order, so spec edges[i] ↔ DOM edgePaths[i]).
+    const edgePaths = Array.from(svgEl.querySelectorAll('g.edgePaths > path, g.edgePaths > g'));
+    edgePaths.forEach((node, i) => {
+      const edge = edges[i];
+      if (!edge) return;
+      const path = node.tagName === 'path' ? node : node.querySelector('path');
+      if (!path) return;
+      path.dataset.archFrom = sid(edge.from);
+      path.dataset.archTo   = sid(edge.to);
+    });
+
+    // Capture the BASE transform of every node (Mermaid's auto-layout
+    // translate) so cluster-drag deltas can be added on top without
+    // accumulating across moves.
+    const nodeBase = new Map();
+    svgEl.querySelectorAll('g.node').forEach((n) => {
+      const m = (n.getAttribute('transform') || '').match(/translate\(\s*([-\d.]+)\s*[,\s]\s*([-\d.]+)\s*\)/);
+      nodeBase.set(n.id, {
+        tx: m ? parseFloat(m[1]) : 0,
+        ty: m ? parseFloat(m[2]) : 0,
+        offsetTx: 0, // accumulated cluster-drag offset
+        offsetTy: 0,
+      });
+    });
+    const findClusterNodes = (clusterDomId) => {
+      const memberSids = clusterMembers.get(clusterDomId) || [];
+      return memberSids
+        .map((s) => svgEl.querySelector(`g.node[id^="flowchart-${s}-"]`))
+        .filter(Boolean);
+    };
+
+    // Cursor + mousedown handler per cluster.
+    let drag = null;
+    svgEl.querySelectorAll('g.cluster').forEach((cluster) => {
+      cluster.style.cursor = 'grab';
+      cluster.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        if (e.target.closest('.node')) return; // node click takes precedence
+        e.stopPropagation();
+        e.preventDefault();
+        const ctm = svgEl.getScreenCTM();
+        const curT = cluster.getAttribute('transform') || '';
+        const m = curT.match(/translate\(\s*([-\d.]+)\s*[,\s]\s*([-\d.]+)\s*\)/);
+        const nodes = findClusterNodes(cluster.id);
+        drag = {
+          cluster,
+          nodes, // DOM elements belonging to this cluster
+          startX: e.clientX, startY: e.clientY,
+          clusterBaseTx: m ? parseFloat(m[1]) : 0,
+          clusterBaseTy: m ? parseFloat(m[2]) : 0,
+          // Snapshot each node's existing total offset so we add the new
+          // delta on top of it.
+          nodeBaseOffsets: nodes.map((n) => {
+            const base = nodeBase.get(n.id);
+            return { tx: base.tx + base.offsetTx, ty: base.ty + base.offsetTy };
+          }),
+          scale: ctm ? ctm.a : 1,
+        };
+        cluster.style.cursor = 'grabbing';
+      });
+    });
+
+    const setTranslate = (el, tx, ty) => {
+      const cur = el.getAttribute('transform') || '';
+      const newT = `translate(${tx}, ${ty})`;
+      el.setAttribute(
+        'transform',
+        /translate\(/.test(cur) ? cur.replace(/translate\([^)]+\)/, newT) : newT,
+      );
+    };
+
+    const onMove = (e) => {
+      if (!drag) return;
+      const dx = (e.clientX - drag.startX) / drag.scale;
+      const dy = (e.clientY - drag.startY) / drag.scale;
+      // Move the cluster chrome.
+      setTranslate(drag.cluster, drag.clusterBaseTx + dx, drag.clusterBaseTy + dy);
+      // Move every member node by the same delta on top of its base.
+      drag.nodes.forEach((n, i) => {
+        const base = drag.nodeBaseOffsets[i];
+        setTranslate(n, base.tx + dx, base.ty + dy);
+      });
+      redrawArchEdges(svgEl);
+    };
+    const onUp = () => {
+      if (!drag) return;
+      const dx = drag.nodes.length
+        ? (parseFloat(drag.nodes[0].getAttribute('transform').match(/translate\(\s*([-\d.]+)/)[1]) - drag.nodeBaseOffsets[0].tx)
+        : 0;
+      const dy = drag.nodes.length
+        ? (parseFloat(drag.nodes[0].getAttribute('transform').match(/translate\([^,]+[,\s]\s*([-\d.]+)/)[1]) - drag.nodeBaseOffsets[0].ty)
+        : 0;
+      // Persist the accumulated cluster offset on each node so future drags
+      // add to it instead of resetting to the base.
+      drag.nodes.forEach((n) => {
+        const base = nodeBase.get(n.id);
+        if (base) {
+          base.offsetTx += dx;
+          base.offsetTy += dy;
+        }
+      });
+      drag.cluster.style.cursor = 'grab';
+      drag = null;
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  function redrawArchEdges(svgEl) {
+    const ctm = svgEl.getScreenCTM();
+    if (!ctm) return;
+    const inv = ctm.inverse();
+    const svgRect = svgEl.getBoundingClientRect();
+    const nodeCache = new Map();
+    const findNode = (sid) => {
+      if (nodeCache.has(sid)) return nodeCache.get(sid);
+      // Mermaid node ids look like `flowchart-n_welcome_page-0`.
+      const node = svgEl.querySelector(`g.node[id^="flowchart-${sid}-"]`) ||
+                   svgEl.querySelector(`g.node[id*="${sid}"]`);
+      nodeCache.set(sid, node);
+      return node;
+    };
+    const centerInSvg = (el) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      // Convert client → SVG-internal coordinates.
+      try {
+        const pt = new DOMPoint(cx, cy).matrixTransform(inv);
+        return { x: pt.x, y: pt.y, w: r.width / ctm.a, h: r.height / ctm.d };
+      } catch (_) {
+        return { x: cx - svgRect.left, y: cy - svgRect.top, w: r.width, h: r.height };
+      }
+    };
+
+    svgEl.querySelectorAll('g.edgePaths path, g.edgePaths g path').forEach((path) => {
+      const from = path.dataset.archFrom;
+      const to   = path.dataset.archTo;
+      if (!from || !to) return;
+      const f = findNode(from);
+      const t = findNode(to);
+      if (!f || !t) return;
+      const fc = centerInSvg(f);
+      const tc = centerInSvg(t);
+      // Orthogonal path: pick the dominant axis for the elbow.
+      const dx = tc.x - fc.x;
+      const dy = tc.y - fc.y;
+      let d;
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        const goingRight = dx >= 0;
+        const fx = goingRight ? fc.x + fc.w / 2 : fc.x - fc.w / 2;
+        const tx = goingRight ? tc.x - tc.w / 2 : tc.x + tc.w / 2;
+        const elbow = fx + (tx - fx) * 0.5;
+        d = `M ${fx} ${fc.y} L ${elbow} ${fc.y} L ${elbow} ${tc.y} L ${tx} ${tc.y}`;
+      } else {
+        const goingDown = dy >= 0;
+        const fy = goingDown ? fc.y + fc.h / 2 : fc.y - fc.h / 2;
+        const ty = goingDown ? tc.y - tc.h / 2 : tc.y + tc.h / 2;
+        const elbow = fy + (ty - fy) * 0.5;
+        d = `M ${fc.x} ${fy} L ${fc.x} ${elbow} L ${tc.x} ${elbow} L ${tc.x} ${ty}`;
+      }
+      path.setAttribute('d', d);
+    });
+  }
+
+  function fitMermaid(pz, svgEl, container) {
+    if (!pz) return;
+    const bbox = svgEl.getBBox();
+    if (!bbox || !bbox.width) return;
+    const padding = 24;
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
+    // Compute the SVG's CSS-rendered position (it lives inside an absolutely
+    // positioned scene). Account for negative-origin viewBoxes by reading
+    // the viewBox attribute directly.
+    const vb = (svgEl.getAttribute('viewBox') || '0 0 0 0').split(/\s+/).map(Number);
+    const vbX = vb[0] || 0, vbY = vb[1] || 0;
+    // Width fit: scale so the diagram exactly fills the container width.
+    // Height fit: separately, ensure we don't zoom in past 1.4x for tiny
+    // diagrams, and don't shrink below ~0.5 for very large ones.
+    let scale = (cw - padding * 2) / bbox.width;
+    scale = Math.min(scale, 1.4);
+    scale = Math.max(scale, 0.5);
+    pz.zoomAbs(0, 0, scale);
+    // Center horizontally; pin to top vertically with padding.
+    const renderedW = bbox.width * scale;
+    const renderedX = (bbox.x - vbX) * scale;
+    const renderedY = (bbox.y - vbY) * scale;
+    const offsetX = (cw - renderedW) / 2 - renderedX;
+    const offsetY = padding - renderedY;
+    pz.moveTo(offsetX, offsetY);
+  }
+
+  function mmdControls(scrollWrap) {
     const controls = el('div', { class: 'canvas__controls' }, [
       el('button', { type: 'button', 'data-zoom': 'in',    title: 'Zoom in' }, '+'),
       el('button', { type: 'button', 'data-zoom': 'out',   title: 'Zoom out' }, '−'),
       el('button', { type: 'button', 'data-zoom': 'fit',   title: 'Fit' }, '⤢'),
       el('button', { type: 'button', 'data-zoom': 'reset', title: 'Reset' }, '⟲'),
     ]);
-    canvas.appendChild(scene); canvas.appendChild(edges); canvas.appendChild(controls);
-    parent.appendChild(canvas);
-
-    let pz = null;
-    if (typeof window.panzoom === 'function') {
-      pz = window.panzoom(scene, { smoothScroll: false, beforeWheel: (e) => !e.ctrlKey && !e.metaKey });
-    }
     controls.addEventListener('click', (e) => {
       const action = e.target.getAttribute?.('data-zoom');
+      const pz = scrollWrap._pz;
       if (!action || !pz) return;
-      if (action === 'in')    pz.smoothZoom(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.25);
-      if (action === 'out')   pz.smoothZoom(canvas.clientWidth / 2, canvas.clientHeight / 2, 0.8);
-      if (action === 'reset') pz.zoomAbs(0, 0, 1), pz.moveTo(0, 0);
-      if (action === 'fit')   fitToContent(pz, scene, canvas);
+      const rect = scrollWrap.getBoundingClientRect();
+      if (action === 'in')    pz.smoothZoom(rect.width / 2, rect.height / 2, 1.25);
+      if (action === 'out')   pz.smoothZoom(rect.width / 2, rect.height / 2, 0.8);
+      if (action === 'reset') { pz.zoomAbs(0, 0, 1); pz.moveTo(0, 0); }
+      if (action === 'fit') {
+        const svgEl = scrollWrap.querySelector('svg');
+        if (svgEl) fitMermaid(pz, svgEl, scrollWrap);
+      }
     });
-    canvas.addEventListener('dblclick', () => pz && fitToContent(pz, scene, canvas));
-
-    return { canvas, scene, edges };
+    return controls;
   }
 
-  function fitToContent(pz, scene, canvas) {
-    const rects = [...scene.children].filter((c) => c.classList?.contains('node')).map((c) => ({
-      x: parseFloat(c.style.left || 0),
-      y: parseFloat(c.style.top || 0),
-      w: c.offsetWidth, h: c.offsetHeight,
-    }));
-    if (!rects.length) return;
-    const minX = Math.min(...rects.map((r) => r.x));
-    const minY = Math.min(...rects.map((r) => r.y));
-    const maxX = Math.max(...rects.map((r) => r.x + r.w));
-    const maxY = Math.max(...rects.map((r) => r.y + r.h));
-    const w = maxX - minX, h = maxY - minY;
-    const scale = Math.min(canvas.clientWidth / (w + 80), canvas.clientHeight / (h + 80), 1);
-    pz.zoomAbs(0, 0, scale);
-    pz.moveTo(-(minX - 40) * scale, -(minY - 40) * scale);
-  }
-
-  // ---------- section renderers (stubs for now; filled in later tasks) ----------
-  function renderSummary(host, s) {
-    const ul = el('ul', { class: 'summary-bullets' });
-    s.bullets.forEach((b) => ul.appendChild(el('li', {}, b)));
-    host.appendChild(ul);
-  }
-  function renderArchitecture(host, a) {
-    const { canvas, scene, edges } = mountCanvas(host);
-
-    // Lay nodes out in a simple grid based on incoming edges. Good enough for v1.
-    const positions = layoutGrid(a.nodes, a.edges);
-    const byId = new Map();
-
-    a.nodes.forEach((n) => {
-      const status = a.details?.[n.id]?.status ?? (n.changed ? 'changed' : 'context');
-      const card = el('div', { class: 'node' + ' is-' + status, style: `left:${positions[n.id].x}px; top:${positions[n.id].y}px` }, [
-        el('div', { class: 'node__head' }, [
-          el('span', { class: 'node__kind' }, kindIcon(n.kind)),
-          el('span', {}, n.label),
-          status !== 'context' ? el('span', { class: `status-chip is-${status}` }, statusChipText(status)) : null,
-        ]),
-        renderNodeBody(a.details?.[n.id]),
-      ]);
-      card.addEventListener('click', (e) => {
-        e.stopPropagation();
-        openDetail(detailHTML(n, a.details?.[n.id]));
-      });
-      card.setAttribute('data-detail-source', n.id);
-      scene.appendChild(card);
-      byId.set(n.id, card);
-    });
-
-    // Draw edges as SVG paths after layout settles.
-    requestAnimationFrame(() => drawEdges(a.edges, byId, edges));
-
-    function kindIcon(k) {
-      return ({ service: 'svc', module: 'mod', datastore: 'db', external: 'ext', ui: 'ui', job: 'job' })[k] || k;
-    }
-    function statusChipText(s) { return ({ 'is-added': '+ added', 'is-changed': '~ changed', 'is-removed': '− removed' })['is-' + s]; }
-    function renderNodeBody(details) {
-      if (!details?.responsibilities?.length) return el('div');
-      return el('div', { class: 'node__body' }, [
-        el('ul', {}, details.responsibilities.slice(0, 4).map((r) => el('li', {}, r))),
-      ]);
-    }
-    function detailHTML(n, d) {
-      const files = (d?.files ?? []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
-      const resp = (d?.responsibilities ?? []).map((r) => `<li>${escapeHTML(r)}</li>`).join('');
-      return `
-        <h3>${escapeHTML(n.label)}</h3>
-        <p><span class="kind-chip">${escapeHTML(n.kind)}</span></p>
-        ${d?.summary ? `<p>${escapeHTML(d.summary)}</p>` : ''}
-        ${resp ? `<h4>Responsibilities</h4><ul>${resp}</ul>` : ''}
-        ${files ? `<h4>Files</h4><div class="prose-card__files">${files}</div>` : ''}
-      `;
-    }
-  }
   function renderFlow(host, f) {
-    const wrap = el('div', { class: 'flow-lanes' });
+    host.appendChild(el('p', {}, 'A real UML sequence — actors at the top, time flows down, each numbered step is a message from one actor to another.'));
 
-    const stepsByActor = new Map(f.actors.map((a) => [a.id, []]));
-    f.steps.forEach((s) => {
-      // Pin the step to its "from" actor's lane; reader can follow the arrow text to "to".
-      if (stepsByActor.has(s.from)) stepsByActor.get(s.from).push(s);
-    });
+    if (!f.actors.length) {
+      host.appendChild(el('p', {}, 'No flow steps to render.'));
+      return;
+    }
 
-    f.actors.forEach((a) => {
-      const lane = el('div', { class: 'flow-lane' }, [
-        el('div', { class: 'flow-lane__header' }, a.label),
-      ]);
-      (stepsByActor.get(a.id) || []).forEach((s) => {
-        const target = f.actors.find((x) => x.id === s.to)?.label || s.to;
-        const step = el('div', {
-          class: 'flow-step' + (s.changed ? ' is-changed' : ''),
-        }, `${s.label} → ${target}`);
-        step.addEventListener('click', () => {
-          openDetail(`<h3>${escapeHTML(s.label)}</h3><p><code>${escapeHTML(s.from)}</code> → <code>${escapeHTML(s.to)}</code></p>`);
-        });
-        lane.appendChild(step);
-      });
-      wrap.appendChild(lane);
-    });
+    const headerH = 64, headerGapY = 36, stepGapY = 56, padding = 32, minActorW = 140, actorGapX = 40;
 
+    const wrap     = el('div', { class: 'flow-seq' });
+    const headerRow= el('div', { class: 'flow-seq__actors' });
+    const stage    = el('div', { class: 'flow-seq__stage' });
+    const lifeSvg  = svg('svg', { class: 'flow-seq__lifelines' });
+    const msgSvg   = svg('svg', { class: 'flow-seq__messages' });
+    stage.appendChild(lifeSvg);
+    stage.appendChild(msgSvg);
+    wrap.appendChild(headerRow);
+    wrap.appendChild(stage);
     host.appendChild(wrap);
-  }
-  function renderDatabase(host, d) {
-    const { canvas, scene, edges } = mountCanvas(host);
 
-    const positions = layoutGrid(d.tables.map((t) => ({ id: t.id })), d.relations || []);
+    const actorEls = f.actors.map((a) => {
+      const card = el('div', { class: 'flow-actor', 'data-actor': a.id }, [
+        el('span', { class: 'flow-actor__kind' }, a.kind || ''),
+        el('span', { class: 'flow-actor__label' }, a.label),
+      ]);
+      headerRow.appendChild(card);
+      return { actor: a, card };
+    });
+
+    requestAnimationFrame(() => {
+      const actorW = actorEls.map(({ card }) => Math.max(minActorW, card.offsetWidth));
+      const totalNatural = actorW.reduce((a, b) => a + b, 0) + actorGapX * (actorEls.length - 1);
+      const availW = Math.max(stage.clientWidth - padding * 2, totalNatural);
+      const extra  = Math.max(0, availW - totalNatural);
+      const perGap = actorEls.length > 1 ? extra / (actorEls.length - 1) : 0;
+
+      const actorX = [];
+      let cursor = padding;
+      actorEls.forEach(({ card }, i) => {
+        actorX.push(cursor + actorW[i] / 2);
+        card.style.left = cursor + 'px';
+        card.style.width = actorW[i] + 'px';
+        cursor += actorW[i] + actorGapX + perGap;
+      });
+      const stageW = cursor + padding - actorGapX - perGap;
+      const stageH = headerGapY + stepGapY * f.steps.length + padding;
+
+      stage.style.width = stageW + 'px';
+      stage.style.height = stageH + 'px';
+      [lifeSvg, msgSvg].forEach((s) => {
+        s.setAttribute('width', stageW);
+        s.setAttribute('height', stageH);
+        s.setAttribute('viewBox', `0 0 ${stageW} ${stageH}`);
+      });
+
+      while (lifeSvg.firstChild) lifeSvg.removeChild(lifeSvg.firstChild);
+      actorX.forEach((x) => {
+        const line = svg('line', { x1: x, x2: x, y1: 0, y2: stageH, class: 'flow-seq__lifeline' });
+        lifeSvg.appendChild(line);
+      });
+
+      while (msgSvg.firstChild) msgSvg.removeChild(msgSvg.firstChild);
+      appendArrowDef(msgSvg);
+      const idx = new Map(f.actors.map((a, i) => [a.id, i]));
+      f.steps.forEach((s, i) => {
+        const fi = idx.get(s.from);
+        const ti = idx.get(s.to);
+        if (fi == null || ti == null) return;
+        const y = headerGapY + stepGapY * (i + 0.5);
+        const isSelf = fi === ti;
+        let path, labelX, labelAnchor;
+        if (isSelf) {
+          const x = actorX[fi];
+          path = svg('path', { d: `M ${x} ${y - 8} L ${x + 36} ${y - 8} L ${x + 36} ${y + 8} L ${x + 4} ${y + 8}` });
+          labelX = x + 40; labelAnchor = 'start';
+        } else {
+          const fx = actorX[fi], tx = actorX[ti];
+          path = svg('line', { x1: fx, y1: y, x2: tx, y2: y });
+          const goingRight = tx > fx;
+          labelX = goingRight ? fx + 8 : fx - 8;
+          labelAnchor = goingRight ? 'start' : 'end';
+        }
+        path.setAttribute('marker-end', 'url(#edge-arrow)');
+        path.setAttribute('class', 'flow-seq__msg' + (s.changed ? ' is-changed' : ''));
+        msgSvg.appendChild(path);
+
+        const availW = isSelf ? 140 : Math.abs(actorX[ti] - actorX[fi]) - 16;
+        const maxChars = Math.max(20, Math.floor(availW / 7.2));
+        const display = s.label.length > maxChars ? s.label.slice(0, maxChars - 1) + '…' : s.label;
+        const text = svg('text', { x: labelX, y: y - 6, 'text-anchor': labelAnchor, class: 'flow-seq__label' });
+        text.textContent = display;
+        if (display !== s.label) {
+          const t = svg('title'); t.textContent = s.label; text.appendChild(t);
+        }
+        msgSvg.appendChild(text);
+
+        const num = svg('text', {
+          x: actorX[fi] + (isSelf ? 0 : (actorX[ti] > actorX[fi] ? 10 : -10)),
+          y: y + 4,
+          'text-anchor': isSelf ? 'middle' : (actorX[ti] > actorX[fi] ? 'start' : 'end'),
+          class: 'flow-seq__num',
+        });
+        num.textContent = (i + 1).toString();
+        msgSvg.appendChild(num);
+
+        const hit = svg('rect', {
+          x: Math.min(labelX - 100, actorX[Math.min(fi, ti)]),
+          y: y - 18,
+          width: Math.max(200, Math.abs(actorX[ti] - actorX[fi]) + 40),
+          height: 28,
+          fill: 'transparent',
+        });
+        hit.style.cursor = 'pointer';
+        hit.addEventListener('click', () => {
+          const fromLabel = f.actors[fi]?.label || s.from;
+          const toLabel   = f.actors[ti]?.label || s.to;
+          openDetail(
+            `<h3>Step ${i + 1}: ${escapeHTML(s.label)}</h3>` +
+            `<p><strong>${escapeHTML(fromLabel)}</strong> → <strong>${escapeHTML(toLabel)}</strong></p>` +
+            (s.changed ? `<p><span class="status-chip is-changed">~ changed</span></p>` : '')
+          );
+        });
+        msgSvg.appendChild(hit);
+      });
+    });
+  }
+
+  function renderDatabase(host, d) {
+    host.appendChild(el('p', {}, [
+      el('span', {}, 'Tables and columns this branch adds, changes, or removes. Field rows are color-coded — green rows are new, blue are modified — amber strips mark privacy-sensitive fields. '),
+      el('strong', {}, 'Drag any table '),
+      el('span', {}, 'to reposition it (relations re-route live), or '),
+      el('strong', {}, 'click '),
+      el('span', {}, 'for its full field list and write/read paths.'),
+    ]));
+
+    const wrap = mountCanvas(host, { allowCardDrag: true });
+    wrap.canvas.appendChild(el('div', { class: 'canvas__hint' }, 'drag tables · hover to focus · ctrl + wheel to zoom'));
+
     const byId = new Map();
+    const links = (d.relations || []).map((r) => ({
+      from: r.from.split('.')[0],
+      to:   r.to.split('.')[0],
+      status: r.status,
+    }));
 
     d.tables.forEach((t) => {
       const card = el('div', {
-        class: `node is-${t.status}`,
-        style: `left:${positions[t.id].x}px; top:${positions[t.id].y}px; min-width:240px;`,
+        class: `node node--draggable is-${t.status}`,
+        style: 'min-width:260px;',
       }, [
         el('div', { class: 'node__head' }, [
           el('span', { class: 'node__kind' }, 'tbl'),
@@ -513,7 +1886,6 @@ body {
         ]),
         el('div', { class: 'node__body', style: 'padding:0;' },
           t.fields.map((f) => {
-            // Explicit class strings to ease testability:
             const explicit = f.status === 'added' ? 'field-row is-added'
                             : f.status === 'changed' ? 'field-row is-changed'
                             : f.status === 'removed' ? 'field-row is-removed'
@@ -531,117 +1903,436 @@ body {
         e.stopPropagation();
         openDetail(detailForTable(t));
       });
-      scene.appendChild(card);
+      wrap.scene.appendChild(card);
       byId.set(t.id, card);
     });
 
-    requestAnimationFrame(() => drawRelations(d.relations || [], byId, edges));
+    requestAnimationFrame(() => {
+      reflowAndDraw({
+        scene: wrap.scene, edges: wrap.edges, byId,
+        nodes: d.tables, links,
+        drawLink: drawRelationEdge,
+      });
+      wireDrag(wrap, byId, links, drawRelationEdge);
+      if (wrap.pz) fitToContent(wrap.pz, wrap.scene, wrap.canvas);
+    });
 
     function detailForTable(t) {
-      const fields = t.fields.map((f) => `<li><code>${escapeHTML(f.name)}</code> · ${escapeHTML(f.type)} · <em>${escapeHTML(f.status)}</em></li>`).join('');
+      const fields = t.fields.map((f) =>
+        `<li><code>${escapeHTML(f.name)}</code> · ${escapeHTML(f.type)} · <em>${escapeHTML(f.status)}</em>${f.privacy ? ' · <strong>pii</strong>' : ''}</li>`
+      ).join('');
       const details = t.details || {};
-      const detailLines = Object.entries(details).map(([k, v]) => `<p><strong>${escapeHTML(k)}:</strong> ${escapeHTML(String(v))}</p>`).join('');
+      const detailLines = Object.entries(details).map(([k, v]) =>
+        `<p><strong>${escapeHTML(k)}:</strong> ${escapeHTML(String(v))}</p>`
+      ).join('');
       return `
         <h3>${escapeHTML(t.name)} <span class="status-chip is-${t.status}">${escapeHTML(t.status)}</span></h3>
-        <h4>Fields</h4><ul>${fields}</ul>
         ${detailLines || ''}
+        <h4>Fields</h4><ul>${fields}</ul>
       `;
     }
   }
+
   function renderCodeObservations(host, c) {
+    host.appendChild(el('p', {}, 'Light callouts the reviewer should see — not blocking, not severity-labelled. Use /review for a full audit.'));
     c.items.forEach((it) => {
-      host.appendChild(el('div', { class: 'prose-card' }, [
-        el('div', { class: 'prose-card__title' }, [
-          el('span', {}, it.title),
-          el('span', { class: 'kind-chip' }, it.kind),
-        ]),
-        it.note ? el('p', { class: 'prose-card__body' }, it.note) : null,
-        (it.files?.length)
-          ? el('div', { class: 'prose-card__files', html: it.files.map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ') })
-          : null,
-      ]));
+      const filesHtml = (it.files || []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
+      const callout = el('div', { class: 'callout callout--review' }, [
+        el('span', { class: 'callout__ic' }, kindIcon(it.kind)),
+        el('div', { html:
+          `<b>${escapeHTML(it.title)}</b>` +
+          (it.note ? `<p>${escapeHTML(it.note)}</p>` : '') +
+          (filesHtml ? `<div class="spec__files">${filesHtml}</div>` : '')
+        }),
+      ]);
+      host.appendChild(callout);
     });
+    function kindIcon(k) {
+      return ({ pattern: '◇', 'risky-spot': '⚠', suggestion: '★' })[k] || '·';
+    }
   }
 
   function renderRiskRollout(host, r) {
+    host.appendChild(el('p', {}, 'Migration order, secret provisioning, deploy-order — the things that bite when shipped wrong.'));
     r.items.forEach((it) => {
-      host.appendChild(el('div', { class: 'prose-card' }, [
-        el('div', { class: 'prose-card__title' }, [
-          el('span', {}, it.title),
-          el('span', { class: 'kind-chip' }, it.severity),
-        ]),
-        el('p', { class: 'prose-card__body' }, it.notes),
-        (it.files?.length)
-          ? el('div', { class: 'prose-card__files', html: it.files.map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ') })
-          : null,
+      const filesHtml = (it.files || []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
+      const callout = el('div', { class: 'callout' + (it.severity === 'careful' ? '' : ' callout--review') }, [
+        el('span', { class: 'callout__ic' }, sevIcon(it.severity)),
+        el('div', { html:
+          `<b>${escapeHTML(it.title)}</b>` +
+          (it.notes ? `<p>${escapeHTML(it.notes)}</p>` : '') +
+          (filesHtml ? `<div class="spec__files">${filesHtml}</div>` : '')
+        }),
+      ]);
+      host.appendChild(callout);
+    });
+    function sevIcon(s) {
+      return ({ info: '○', watch: '◐', careful: '●' })[s] || '·';
+    }
+  }
+
+  function renderOpenQuestions(host, o) {
+    host.appendChild(el('p', {}, 'Things the reviewer should resolve before approving. Each is a real question someone needs to answer.'));
+    o.items.forEach((q) => {
+      host.appendChild(el('div', { class: 'callout callout--question' }, [
+        el('span', { class: 'callout__ic' }, '?'),
+        el('div', {}, q),
       ]));
     });
   }
 
-  function renderOpenQuestions(host, o) {
-    const ul = el('ul', { class: 'summary-bullets' });
-    o.items.forEach((q) => ul.appendChild(el('li', {}, q)));
-    host.appendChild(ul);
-  }
+  // ============================================================
+  // Canvas / panzoom / layout
+  // ============================================================
 
-  function layoutGrid(nodes, edges) {
-    // Topological-ish: sources on the left, sinks on the right. 240x180 cells.
-    const incoming = new Map(nodes.map((n) => [n.id, 0]));
-    for (const e of edges) incoming.set(e.to, (incoming.get(e.to) || 0) + 1);
-    const sorted = [...nodes].sort((a, b) => (incoming.get(a.id) - incoming.get(b.id)));
-    const colHeight = Math.max(2, Math.ceil(Math.sqrt(sorted.length)));
-    const pos = {};
-    sorted.forEach((n, i) => {
-      const col = Math.floor(i / colHeight);
-      const row = i % colHeight;
-      pos[n.id] = { x: 40 + col * 320, y: 40 + row * 180 };
+  function mountCanvas(parent, opts = {}) {
+    const canvas = el('div', { class: 'canvas' });
+    const scene  = el('div', { class: 'canvas__scene' });
+    const edges  = svg('svg', { class: 'canvas__edges' });
+    const controls = el('div', { class: 'canvas__controls' }, [
+      el('button', { type: 'button', 'data-zoom': 'in',    title: 'Zoom in' }, '+'),
+      el('button', { type: 'button', 'data-zoom': 'out',   title: 'Zoom out' }, '−'),
+      el('button', { type: 'button', 'data-zoom': 'fit',   title: 'Fit' }, '⤢'),
+      el('button', { type: 'button', 'data-zoom': 'reset', title: 'Reset' }, '⟲'),
+    ]);
+    scene.appendChild(edges);
+    canvas.appendChild(scene);
+    canvas.appendChild(controls);
+    parent.appendChild(canvas);
+
+    let pz = null;
+    if (typeof window.panzoom === 'function') {
+      pz = window.panzoom(scene, {
+        smoothScroll: false,
+        beforeWheel: (e) => !e.ctrlKey && !e.metaKey,
+        // When card-drag is enabled for this canvas, panzoom must yield to
+        // the card's own mousedown handler — otherwise the canvas pans
+        // instead of the card moving.
+        beforeMouseDown: opts.allowCardDrag
+          ? (e) => !!e.target.closest?.('.node--draggable')
+          : undefined,
+      });
+    }
+    controls.addEventListener('click', (e) => {
+      const action = e.target.getAttribute?.('data-zoom');
+      if (!action || !pz) return;
+      if (action === 'in')    pz.smoothZoom(canvas.clientWidth / 2, canvas.clientHeight / 2, 1.25);
+      if (action === 'out')   pz.smoothZoom(canvas.clientWidth / 2, canvas.clientHeight / 2, 0.8);
+      if (action === 'reset') { pz.zoomAbs(0, 0, 1); pz.moveTo(0, 0); }
+      if (action === 'fit')   fitToContent(pz, scene, canvas);
     });
-    return pos;
+    canvas.addEventListener('dblclick', () => pz && fitToContent(pz, scene, canvas));
+    return { canvas, scene, edges, pz };
   }
 
-  function drawEdges(edges, byId, svg) {
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    svg.setAttribute('viewBox', `0 0 4000 4000`);
-    svg.setAttribute('width', '4000'); svg.setAttribute('height', '4000');
-    edges.forEach((e) => {
-      const fromCard = byId.get(e.from); const toCard = byId.get(e.to);
-      if (!fromCard || !toCard) return;
-      const fx = parseFloat(fromCard.style.left) + fromCard.offsetWidth;
-      const fy = parseFloat(fromCard.style.top)  + fromCard.offsetHeight / 2;
-      const tx = parseFloat(toCard.style.left);
-      const ty = parseFloat(toCard.style.top)    + toCard.offsetHeight / 2;
-      const cx = (fx + tx) / 2;
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', `M ${fx} ${fy} C ${cx} ${fy}, ${cx} ${ty}, ${tx} ${ty}`);
-      if (e.kind === 'async') path.classList.add('is-async');
-      svg.appendChild(path);
+  function fitToContent(pz, scene, canvas) {
+    const rects = [...scene.children].filter((c) => c.classList?.contains('node')).map((c) => ({
+      x: parseFloat(c.style.left || 0),
+      y: parseFloat(c.style.top  || 0),
+      w: c.offsetWidth, h: c.offsetHeight,
+    }));
+    if (!rects.length) return;
+    const minX = Math.min(...rects.map((r) => r.x));
+    const minY = Math.min(...rects.map((r) => r.y));
+    const maxX = Math.max(...rects.map((r) => r.x + r.w));
+    const maxY = Math.max(...rects.map((r) => r.y + r.h));
+    const w = maxX - minX, h = maxY - minY;
+    if (w < 1 || h < 1) return;
+    const scale = Math.min(canvas.clientWidth / (w + 80), canvas.clientHeight / (h + 80), 1);
+    pz.zoomAbs(0, 0, scale);
+    pz.moveTo(-(minX - 40) * scale, -(minY - 40) * scale);
+  }
+
+  function reflowAndDraw({ scene, edges, byId, nodes, links, drawLink }) {
+    if (nodes.length === 0) return;
+    const layer = assignLayers(nodes, links);
+    const maxLayer = Math.max(0, ...layer.values());
+    const layerGroups = Array.from({ length: maxLayer + 1 }, () => []);
+    nodes.forEach((n) => layerGroups[layer.get(n.id)].push(n.id));
+
+    const padding = 32, colGap = 110, rowGap = 28;
+    const layerWidths = layerGroups.map((ids) =>
+      ids.reduce((w, id) => Math.max(w, byId.get(id)?.offsetWidth || 0), 0)
+    );
+    const colX = [];
+    let cursor = padding;
+    layerWidths.forEach((w) => { colX.push(cursor); cursor += w + colGap; });
+    const sceneW = cursor - colGap + padding;
+
+    const colY = new Array(maxLayer + 1).fill(padding);
+    layerGroups.forEach((ids, c) => {
+      ids.forEach((id) => {
+        const card = byId.get(id);
+        if (!card) return;
+        const cardX = colX[c] + (layerWidths[c] - card.offsetWidth) / 2;
+        card.style.left = cardX + 'px';
+        card.style.top  = colY[c] + 'px';
+        colY[c] += card.offsetHeight + rowGap;
+      });
+    });
+    const sceneH = Math.max(padding * 2, ...colY) + padding;
+
+    scene.style.width  = sceneW + 'px';
+    scene.style.height = sceneH + 'px';
+    edges.setAttribute('viewBox', `0 0 ${sceneW} ${sceneH}`);
+    edges.setAttribute('width',  sceneW);
+    edges.setAttribute('height', sceneH);
+
+    redrawEdges(edges, byId, links, drawLink);
+    scene.appendChild(edges); // paint over cards so labels are never hidden
+
+    wireFocus(scene, edges, links);
+  }
+
+  function redrawEdges(edges, byId, links, drawLink) {
+    while (edges.firstChild) edges.removeChild(edges.firstChild);
+    appendArrowDef(edges);
+    const fanOut = new Map();
+    links.forEach((link, i) => {
+      const k = link.from;
+      if (!fanOut.has(k)) fanOut.set(k, []);
+      fanOut.get(k).push(i);
+    });
+    links.forEach((link, i) => {
+      const siblings = fanOut.get(link.from) || [i];
+      const slot = siblings.indexOf(i);
+      const lane = (slot + 1) / (siblings.length + 1);
+      drawLink(link, byId, edges, { lane, scene: edges.parentElement });
     });
   }
 
-  function drawRelations(relations, byId, svg) {
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    svg.setAttribute('viewBox', `0 0 4000 4000`);
-    svg.setAttribute('width', '4000'); svg.setAttribute('height', '4000');
-    relations.forEach((r) => {
-      const fromTable = r.from.split('.')[0];
-      const toTable   = r.to.split('.')[0];
-      const fromCard  = byId.get(fromTable);
-      const toCard    = byId.get(toTable);
-      if (!fromCard || !toCard) return;
-      const fx = parseFloat(fromCard.style.left) + fromCard.offsetWidth;
-      const fy = parseFloat(fromCard.style.top)  + fromCard.offsetHeight / 2;
-      const tx = parseFloat(toCard.style.left);
-      const ty = parseFloat(toCard.style.top)    + toCard.offsetHeight / 2;
-      const cx = (fx + tx) / 2;
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', `M ${fx} ${fy} C ${cx} ${fy}, ${cx} ${ty}, ${tx} ${ty}`);
-      if (r.status === 'removed') path.classList.add('is-dimmed');
-      svg.appendChild(path);
+  function assignLayers(nodes, links) {
+    const layer = new Map(nodes.map((n) => [n.id, 0]));
+    const incoming = new Map(nodes.map((n) => [n.id, []]));
+    for (const l of links) {
+      if (incoming.has(l.to)) incoming.get(l.to).push(l.from);
+    }
+    for (let pass = 0; pass < nodes.length + 1; pass++) {
+      let changed = false;
+      nodes.forEach((n) => {
+        const ins = incoming.get(n.id) || [];
+        if (ins.length === 0) return;
+        const want = Math.max(...ins.map((id) => (layer.get(id) ?? 0) + 1));
+        if (want > layer.get(n.id)) { layer.set(n.id, want); changed = true; }
+      });
+      if (!changed) break;
+    }
+    const cap = 5;
+    layer.forEach((v, k) => { if (v > cap) layer.set(k, cap); });
+    return layer;
+  }
+
+  function wireFocus(scene, edges, links) {
+    const cards = Array.from(scene.querySelectorAll('.node'));
+    const linkPaths = Array.from(edges.querySelectorAll('path:not(.edge-arrow), line'));
+    const byFrom = new Map(), byTo = new Map();
+    links.forEach((l, i) => {
+      if (!byFrom.has(l.from)) byFrom.set(l.from, []);
+      if (!byTo.has(l.to)) byTo.set(l.to, []);
+      byFrom.get(l.from).push(i);
+      byTo.get(l.to).push(i);
+    });
+    const clear = () => {
+      cards.forEach((c) => c.classList.remove('is-dimmed'));
+      linkPaths.forEach((p) => p.classList.remove('is-focus-dim'));
+    };
+    const focus = (id) => {
+      const related = new Set([id]);
+      (byFrom.get(id) || []).forEach((i) => related.add(links[i].to));
+      (byTo.get(id) || []).forEach((i) => related.add(links[i].from));
+      cards.forEach((c) => c.classList.toggle('is-dimmed', !related.has(c.getAttribute('data-detail-source'))));
+      linkPaths.forEach((p, i) => {
+        const link = links[i];
+        const active = link && (link.from === id || link.to === id);
+        p.classList.toggle('is-focus-dim', !active);
+      });
+    };
+    cards.forEach((c) => c.addEventListener('mouseenter', () => focus(c.getAttribute('data-detail-source'))));
+    const cv = scene.parentElement;
+    if (cv) cv.addEventListener('mouseleave', clear);
+  }
+
+  // Wire drag-to-reposition on every .node--draggable card. Edges re-route
+  // live during the drag; the scene grows to fit when a card is moved past
+  // the current bounds.
+  function wireDrag(wrap, byId, links, drawLink) {
+    const scene = wrap.scene;
+    const edges = wrap.edges;
+    const cards = Array.from(scene.querySelectorAll('.node--draggable'));
+    let drag = null;
+    cards.forEach((card) => {
+      card.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.stopPropagation();
+        e.preventDefault();
+        const sceneRect = scene.getBoundingClientRect();
+        const scale = sceneRect.width / scene.offsetWidth || 1;
+        drag = {
+          card,
+          startX: e.clientX, startY: e.clientY,
+          origLeft: parseFloat(card.style.left || 0),
+          origTop:  parseFloat(card.style.top  || 0),
+          scale,
+        };
+        card.classList.add('is-dragging');
+      });
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (!drag) return;
+      const dx = (e.clientX - drag.startX) / drag.scale;
+      const dy = (e.clientY - drag.startY) / drag.scale;
+      drag.card.style.left = (drag.origLeft + dx) + 'px';
+      drag.card.style.top  = (drag.origTop  + dy) + 'px';
+      redrawEdges(edges, byId, links, drawLink);
+      scene.appendChild(edges);
+    });
+    document.addEventListener('mouseup', () => {
+      if (!drag) return;
+      drag.card.classList.remove('is-dragging');
+      growSceneToFit(scene, edges);
+      redrawEdges(edges, byId, links, drawLink);
+      scene.appendChild(edges);
+      drag = null;
     });
   }
 
-  // ---------- shared helpers exposed for renderers ----------
-  window.__pro = { el, escapeHTML, mountCanvas, openDetail, closeDetail };
+  function growSceneToFit(scene, edges) {
+    let maxRight = 0, maxBottom = 0;
+    Array.from(scene.children).forEach((c) => {
+      if (!c.classList?.contains('node')) return;
+      const right  = parseFloat(c.style.left || 0) + c.offsetWidth;
+      const bottom = parseFloat(c.style.top  || 0) + c.offsetHeight;
+      if (right > maxRight)   maxRight = right;
+      if (bottom > maxBottom) maxBottom = bottom;
+    });
+    const w = Math.max(scene.offsetWidth, maxRight + 60);
+    const h = Math.max(scene.offsetHeight, maxBottom + 60);
+    scene.style.width  = w + 'px';
+    scene.style.height = h + 'px';
+    edges.setAttribute('width',  w);
+    edges.setAttribute('height', h);
+    edges.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  }
+
+  // ---------- arrow def + edge drawers ----------
+  function appendArrowDef(svgEl) {
+    const defs = svg('defs');
+    const marker = svg('marker', {
+      id: 'edge-arrow', viewBox: '0 0 10 10',
+      refX: 9, refY: 5, markerWidth: 7, markerHeight: 7,
+      orient: 'auto-start-reverse',
+    });
+    const arrow = svg('path', { d: 'M 0 0 L 10 5 L 0 10 z', class: 'edge-arrow' });
+    arrow.setAttribute('fill', 'currentColor');
+    marker.appendChild(arrow);
+    defs.appendChild(marker);
+    svgEl.appendChild(defs);
+  }
+
+  function routePath(fromCard, toCard, opts = {}) {
+    const lane = typeof opts.lane === 'number' ? opts.lane : 0.5;
+    const fl = parseFloat(fromCard.style.left), ft = parseFloat(fromCard.style.top);
+    const fw = fromCard.offsetWidth,             fh = fromCard.offsetHeight;
+    const tl = parseFloat(toCard.style.left),    tt = parseFloat(toCard.style.top);
+    const tw = toCard.offsetWidth,               th = toCard.offsetHeight;
+    const fcx = fl + fw / 2, fcy = ft + fh / 2;
+    const tcx = tl + tw / 2, tcy = tt + th / 2;
+    const dx = tcx - fcx;
+    const dy = tcy - fcy;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const goingRight = dx >= 0;
+      const fx = goingRight ? fl + fw : fl;
+      const fy = ft + fh / 2 + (lane - 0.5) * (fh - 16);
+      const tx = goingRight ? tl : tl + tw;
+      const ty = tt + th / 2;
+      const elbowX = fx + (tx - fx) * (0.5 + (lane - 0.5) * 0.4);
+      return `M ${fx} ${fy} L ${elbowX} ${fy} L ${elbowX} ${ty} L ${tx} ${ty}`;
+    } else {
+      const goingDown = dy >= 0;
+      const fx = fl + fw / 2;
+      const fy = goingDown ? ft + fh : ft;
+      const tx = tl + tw / 2;
+      const ty = goingDown ? tt : tt + th;
+      const elbowY = fy + (ty - fy) * (0.5 + (lane - 0.5) * 0.4);
+      return `M ${fx} ${fy} L ${fx} ${elbowY} L ${tx} ${elbowY} L ${tx} ${ty}`;
+    }
+  }
+
+  function appendEdgeLabel(svgEl, fromCard, toCard, label, scene, opts = {}) {
+    const lane = typeof opts.lane === 'number' ? opts.lane : 0.5;
+    const fl = parseFloat(fromCard.style.left), ft = parseFloat(fromCard.style.top);
+    const fw = fromCard.offsetWidth,             fh = fromCard.offsetHeight;
+    const tl = parseFloat(toCard.style.left),    tt = parseFloat(toCard.style.top);
+    const tw = toCard.offsetWidth,               th = toCard.offsetHeight;
+    const dx = (tl + tw / 2) - (fl + fw / 2);
+    const dy = (tt + th / 2) - (ft + fh / 2);
+    const horizontal = Math.abs(dx) >= Math.abs(dy);
+
+    let lx, ly, anchor;
+    if (horizontal) {
+      const goingRight = dx >= 0;
+      const fx = goingRight ? fl + fw : fl;
+      const tx = goingRight ? tl : tl + tw;
+      const fy = ft + fh / 2 + (lane - 0.5) * (fh - 16);
+      const ty = tt + th / 2;
+      const elbowX = fx + (tx - fx) * (0.5 + (lane - 0.5) * 0.4);
+      lx = elbowX; ly = (fy + ty) / 2 + 4; anchor = 'middle';
+    } else {
+      const goingDown = dy >= 0;
+      const fy = goingDown ? ft + fh : ft;
+      const ty = goingDown ? tt : tt + th;
+      const fx = fl + fw / 2;
+      const tx = tl + tw / 2;
+      const elbowY = fy + (ty - fy) * (0.5 + (lane - 0.5) * 0.4);
+      lx = (fx + tx) / 2; ly = elbowY - 6; anchor = 'middle';
+    }
+
+    if (scene) {
+      for (const node of scene.children) {
+        if (node === fromCard || node === toCard) continue;
+        if (!node.classList?.contains('node')) continue;
+        const nl = parseFloat(node.style.left || 0), nt = parseFloat(node.style.top || 0);
+        const nw = node.offsetWidth, nh = node.offsetHeight;
+        if (lx >= nl - 4 && lx <= nl + nw + 4 && ly >= nt - 4 && ly <= nt + nh + 4) return;
+      }
+    }
+
+    const MAX = 22;
+    const display = label.length > MAX ? label.slice(0, MAX - 1) + '…' : label;
+    const text = svg('text', { x: lx, y: ly, 'text-anchor': anchor, class: 'edge-label' });
+    text.textContent = display;
+    if (display !== label) {
+      const title = svg('title');
+      title.textContent = label;
+      text.appendChild(title);
+    }
+    svgEl.appendChild(text);
+  }
+
+  function drawArchEdge(e, byId, svgEl, opts = {}) {
+    const fromCard = byId.get(e.from); const toCard = byId.get(e.to);
+    if (!fromCard || !toCard) return;
+    const path = svg('path', { d: routePath(fromCard, toCard, opts), 'marker-end': 'url(#edge-arrow)' });
+    path.setAttribute('data-from', e.from);
+    path.setAttribute('data-to', e.to);
+    if (e.kind === 'async') path.classList.add('is-async');
+    if (e.kind === 'data')  path.classList.add('is-data');
+    svgEl.appendChild(path);
+    if (e.label) appendEdgeLabel(svgEl, fromCard, toCard, e.label, opts.scene || svgEl.parentElement, opts);
+  }
+
+  function drawRelationEdge(r, byId, svgEl, opts = {}) {
+    const fromCard = byId.get(r.from); const toCard = byId.get(r.to);
+    if (!fromCard || !toCard) return;
+    const path = svg('path', { d: routePath(fromCard, toCard, opts), 'marker-end': 'url(#edge-arrow)' });
+    path.setAttribute('data-from', r.from);
+    path.setAttribute('data-to', r.to);
+    if (r.status === 'removed') path.classList.add('is-dimmed');
+    if (r.status === 'added')   path.classList.add('is-added');
+    svgEl.appendChild(path);
+  }
+
+  Object.assign(window.__pro, { el, escapeHTML, openDetail, closeDetail });
 })();
 </script>
 </body>

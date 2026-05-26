@@ -5,7 +5,6 @@ const STATUS = new Set(['added', 'changed', 'removed', 'context']);
 const NODE_KINDS = new Set(['service', 'module', 'datastore', 'external', 'ui', 'job']);
 const EDGE_KINDS = new Set(['sync', 'async', 'data']);
 const ACTOR_KINDS = new Set(['user', 'service', 'module', 'datastore', 'external']);
-const OBS_KINDS = new Set(['pattern', 'risky-spot', 'suggestion']);
 const SEVERITY = new Set(['info', 'watch', 'careful']);
 
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -29,19 +28,20 @@ export function validate(spec) {
 
   // allowed top-level keys only
   const ALLOWED = new Set([
-    'meta', 'summary', 'architecture', 'flow', 'database',
-    'code_observations', 'risk_rollout', 'open_questions',
+    'meta', 'summary', 'architecture', 'flow', 'flows', 'database',
+    'risk_rollout', 'open_questions',
   ]);
   for (const k of Object.keys(spec)) {
     if (!ALLOWED.has(k)) push('$', `unknown key: ${k}`);
   }
+  if ('flow' in spec && 'flows' in spec) push('$', 'use either flow (single) or flows (array), not both');
 
   if ('meta' in spec)              validateMeta(spec.meta, push);
   if ('summary' in spec)           validateSummary(spec.summary, push);
   if ('architecture' in spec)      validateArchitecture(spec.architecture, push);
-  if ('flow' in spec)              validateFlow(spec.flow, push);
+  if ('flow' in spec)              validateFlow(spec.flow, push, 'flow');
+  if ('flows' in spec)             validateFlows(spec.flows, push);
   if ('database' in spec)          validateDatabase(spec.database, push);
-  if ('code_observations' in spec) validateCodeObservations(spec.code_observations, push);
   if ('risk_rollout' in spec)      validateRiskRollout(spec.risk_rollout, push);
   if ('open_questions' in spec)    validateOpenQuestions(spec.open_questions, push);
 
@@ -68,13 +68,49 @@ function validateMeta(m, push) {
 
 function validateSummary(s, push) {
   if (!isObj(s)) { push('summary', 'must be object'); return; }
-  if (!Array.isArray(s.bullets)) { push('summary.bullets', 'must be array'); return; }
-  if (s.bullets.length < 1 || s.bullets.length > 7) push('summary.bullets', 'must have 1-7 items');
-  s.bullets.forEach((b, i) => { if (!isStr(b)) push(`summary.bullets[${i}]`, 'must be string'); });
+  if (!isStr(s.tldr)) push('summary.tldr', 'required string (the 1–2 sentence lede)');
+  if (!Array.isArray(s.ships)) {
+    push('summary.ships', 'required array (1–6 items naming what this PR ships)');
+  } else {
+    if (s.ships.length < 1 || s.ships.length > 6) push('summary.ships', 'must have 1–6 items');
+    s.ships.forEach((b, i) => { if (!isStr(b)) push(`summary.ships[${i}]`, 'must be string'); });
+  }
+  if ('why' in s && !isStr(s.why)) push('summary.why', 'must be string');
+  if ('changes' in s) {
+    if (!Array.isArray(s.changes)) push('summary.changes', 'must be array');
+    else {
+      if (s.changes.length > 6) push('summary.changes', 'max 6 items');
+      s.changes.forEach((b, i) => { if (!isStr(b)) push(`summary.changes[${i}]`, 'must be string'); });
+    }
+  }
+  if ('topics' in s) {
+    if (!Array.isArray(s.topics)) { push('summary.topics', 'must be array'); return; }
+    if (s.topics.length > 8) push('summary.topics', 'max 8 items');
+    s.topics.forEach((t, i) => {
+      const p = `summary.topics[${i}]`;
+      if (!isObj(t)) { push(p, 'must be object'); return; }
+      if (!isStr(t.title))   push(`${p}.title`, 'required string');
+      if (!isStr(t.summary)) push(`${p}.summary`, 'required string');
+      if ('body' in t && !isStr(t.body)) push(`${p}.body`, 'must be string');
+      validateHighlights(t.highlights, push, `${p}.highlights`);
+      if ('code' in t) {
+        if (!Array.isArray(t.code)) push(`${p}.code`, 'must be array');
+        else t.code.forEach((c, j) => {
+          const cp = `${p}.code[${j}]`;
+          if (!isObj(c)) { push(cp, 'must be object'); return; }
+          if (!isStr(c.body)) push(`${cp}.body`, 'required string');
+          if ('lang' in c && !isStr(c.lang)) push(`${cp}.lang`, 'must be string');
+          if ('file' in c && !isStr(c.file)) push(`${cp}.file`, 'must be string');
+        });
+      }
+    });
+  }
 }
 
 function validateArchitecture(a, push) {
   if (!isObj(a)) { push('architecture', 'must be object'); return; }
+  if ('summary' in a && !isStr(a.summary)) push('architecture.summary', 'must be string');
+  validateHighlights(a.highlights, push, 'architecture.highlights');
   if (!Array.isArray(a.nodes)) push('architecture.nodes', 'must be array');
   else a.nodes.forEach((n, i) => {
     const p = `architecture.nodes[${i}]`;
@@ -100,26 +136,44 @@ function validateArchitecture(a, push) {
   }
 }
 
-function validateFlow(f, push) {
-  if (!isObj(f)) { push('flow', 'must be object'); return; }
-  if (!Array.isArray(f.actors)) push('flow.actors', 'must be array');
+function validateFlow(f, push, path) {
+  if (!isObj(f)) { push(path, 'must be object'); return; }
+  if ('title'   in f && !isStr(f.title))   push(`${path}.title`, 'must be string');
+  if ('summary' in f && !isStr(f.summary)) push(`${path}.summary`, 'must be string');
+  validateHighlights(f.highlights, push, `${path}.highlights`);
+  if (!Array.isArray(f.actors)) push(`${path}.actors`, 'must be array');
   else f.actors.forEach((a, i) => {
-    const p = `flow.actors[${i}]`;
+    const p = `${path}.actors[${i}]`;
     if (!isStr(a.id)) push(`${p}.id`, 'required string');
     if (!isStr(a.label)) push(`${p}.label`, 'required string');
     if ('kind' in a && !ACTOR_KINDS.has(a.kind)) push(`${p}.kind`, `must be one of ${[...ACTOR_KINDS].join('|')}`);
   });
-  if (!Array.isArray(f.steps)) push('flow.steps', 'must be array');
+  if (!Array.isArray(f.steps)) push(`${path}.steps`, 'must be array');
   else f.steps.forEach((s, i) => {
-    const p = `flow.steps[${i}]`;
+    const p = `${path}.steps[${i}]`;
     if (!isStr(s.from)) push(`${p}.from`, 'required string');
     if (!isStr(s.to)) push(`${p}.to`, 'required string');
     if (!isStr(s.label)) push(`${p}.label`, 'required string');
   });
 }
 
+function validateHighlights(h, push, path) {
+  if (h === undefined) return;
+  if (!Array.isArray(h)) { push(path, 'must be array of strings'); return; }
+  if (h.length > 5) push(path, 'max 5 items');
+  h.forEach((s, i) => { if (!isStr(s)) push(`${path}[${i}]`, 'must be string'); });
+}
+
+function validateFlows(flows, push) {
+  if (!Array.isArray(flows)) { push('flows', 'must be array'); return; }
+  if (flows.length < 1) push('flows', 'must have at least one flow');
+  flows.forEach((f, i) => validateFlow(f, push, `flows[${i}]`));
+}
+
 function validateDatabase(d, push) {
   if (!isObj(d)) { push('database', 'must be object'); return; }
+  if ('summary' in d && !isStr(d.summary)) push('database.summary', 'must be string');
+  validateHighlights(d.highlights, push, 'database.highlights');
   if (!Array.isArray(d.tables)) { push('database.tables', 'must be array'); return; }
   d.tables.forEach((t, i) => {
     const p = `database.tables[${i}]`;
@@ -143,17 +197,6 @@ function validateDatabase(d, push) {
       if ('status' in r && !STATUS.has(r.status)) push(`${p}.status`, `must be one of ${[...STATUS].join('|')}`);
     });
   }
-}
-
-function validateCodeObservations(c, push) {
-  if (!isObj(c)) { push('code_observations', 'must be object'); return; }
-  if (!Array.isArray(c.items)) { push('code_observations.items', 'must be array'); return; }
-  if (c.items.length > 5) push('code_observations.items', 'max 5 items');
-  c.items.forEach((it, i) => {
-    const p = `code_observations.items[${i}]`;
-    if (!isStr(it.title)) push(`${p}.title`, 'required string');
-    if (!OBS_KINDS.has(it.kind)) push(`${p}.kind`, `must be one of ${[...OBS_KINDS].join('|')}`);
-  });
 }
 
 function validateRiskRollout(r, push) {

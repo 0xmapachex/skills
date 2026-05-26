@@ -6,29 +6,71 @@
     "files_changed": 4,
     "additions": 62,
     "deletions": 0,
-    "pr_type_tags": ["db-schema", "migration"]
+    "pr_type_tags": [
+      "db-schema",
+      "migration"
+    ]
   },
   "summary": {
-    "bullets": [
-      "Adds channel_id and is_inferred to the proposals table to support inferred Slack channel routing.",
-      "Adds an index on (tenant_id, channel_id) for the new lookup path.",
-      "Backfill: existing rows get channel_id=NULL, is_inferred=false."
+    "tldr": "Adds `channel_id` + `is_inferred` to the `proposals` table to support inferred Slack channel routing, plus a `(tenant_id, channel_id)` index for the new lookup path.",
+    "ships": [
+      "`proposals.channel_id` (nullable text) \u2014 inferred Slack channel for the routed message.",
+      "`proposals.is_inferred` (boolean, default false) \u2014 flags channel inferred vs explicit.",
+      "Index on `(tenant_id, channel_id)` for the new lookup path."
+    ],
+    "changes": [
+      "Existing rows backfill to `channel_id=NULL`, `is_inferred=false`.",
+      "Drizzle generator emits ADD COLUMN before CREATE INDEX \u2014 order-sensitive."
     ]
   },
   "architecture": {
     "nodes": [
-      { "id": "migration", "label": "drizzle/migrations/0007", "kind": "module",    "changed": true },
-      { "id": "schema",    "label": "drizzle/schema.ts",        "kind": "module",    "changed": true },
-      { "id": "db",        "label": "Cloud SQL Postgres",       "kind": "datastore", "changed": true }
+      {
+        "id": "migration",
+        "label": "drizzle/migrations/0007",
+        "kind": "module",
+        "changed": true
+      },
+      {
+        "id": "schema",
+        "label": "drizzle/schema.ts",
+        "kind": "module",
+        "changed": true
+      },
+      {
+        "id": "db",
+        "label": "Cloud SQL Postgres",
+        "kind": "datastore",
+        "changed": true
+      }
     ],
     "edges": [
-      { "from": "migration", "to": "db",     "label": "DDL", "kind": "sync" },
-      { "from": "schema",    "to": "db",     "label": "queries", "kind": "data" }
+      {
+        "from": "migration",
+        "to": "db",
+        "label": "DDL",
+        "kind": "sync"
+      },
+      {
+        "from": "schema",
+        "to": "db",
+        "label": "queries",
+        "kind": "data"
+      }
     ],
     "details": {
-      "migration": { "summary": "Drizzle-generated migration. Order-sensitive: ADD COLUMN before CREATE INDEX.", "status": "added" },
-      "schema":    { "summary": "Drizzle schema; updated alongside the migration.", "status": "changed" },
-      "db":        { "summary": "Production Postgres; cloud-sql-proxy in dev.", "status": "context" }
+      "migration": {
+        "summary": "Drizzle-generated migration. Order-sensitive: ADD COLUMN before CREATE INDEX.",
+        "status": "added"
+      },
+      "schema": {
+        "summary": "Drizzle schema; updated alongside the migration.",
+        "status": "changed"
+      },
+      "db": {
+        "summary": "Production Postgres; cloud-sql-proxy in dev.",
+        "status": "context"
+      }
     }
   },
   "database": {
@@ -38,10 +80,31 @@
         "name": "proposals",
         "status": "changed",
         "fields": [
-          { "name": "id",          "type": "uuid",      "status": "context",  "nullable": false },
-          { "name": "tenant_id",   "type": "uuid",      "status": "context",  "nullable": false },
-          { "name": "channel_id",  "type": "text",      "status": "added",    "nullable": true },
-          { "name": "is_inferred", "type": "boolean",   "status": "added",    "nullable": false, "default": "false" }
+          {
+            "name": "id",
+            "type": "uuid",
+            "status": "context",
+            "nullable": false
+          },
+          {
+            "name": "tenant_id",
+            "type": "uuid",
+            "status": "context",
+            "nullable": false
+          },
+          {
+            "name": "channel_id",
+            "type": "text",
+            "status": "added",
+            "nullable": true
+          },
+          {
+            "name": "is_inferred",
+            "type": "boolean",
+            "status": "added",
+            "nullable": false,
+            "default": "false"
+          }
         ],
         "details": {
           "purpose": "One row per Safe transaction the agent has proposed.",
@@ -54,13 +117,27 @@
         "name": "tenants",
         "status": "context",
         "fields": [
-          { "name": "id",   "type": "uuid", "status": "context", "nullable": false },
-          { "name": "name", "type": "text", "status": "context", "nullable": false }
+          {
+            "name": "id",
+            "type": "uuid",
+            "status": "context",
+            "nullable": false
+          },
+          {
+            "name": "name",
+            "type": "text",
+            "status": "context",
+            "nullable": false
+          }
         ]
       }
     ],
     "relations": [
-      { "from": "proposals.tenant_id", "to": "tenants.id", "status": "context" }
+      {
+        "from": "proposals.tenant_id",
+        "to": "tenants.id",
+        "status": "context"
+      }
     ]
   },
   "risk_rollout": {
@@ -69,7 +146,9 @@
         "title": "ADD COLUMN before CREATE INDEX",
         "severity": "watch",
         "notes": "Generated migration sometimes emits ADD COLUMN AFTER index statements that reference the column. Hand-edit if so.",
-        "files": ["drizzle/migrations/0007_add_channel_routing.sql"]
+        "files": [
+          "drizzle/migrations/0007_add_channel_routing.sql"
+        ]
       },
       {
         "title": "Backfill NULL channel_id",
