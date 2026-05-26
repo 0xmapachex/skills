@@ -125,7 +125,11 @@
   const navOl = document.querySelector('[data-nav]');
   let n = 0;
   ORDER.forEach((key) => {
-    if (!data[key]) return;
+    // The flow section accepts either `flow` (single) or `flows` (array of
+    // titled flows). Normalize at the dispatch site so the renderer only
+    // sees one shape.
+    const payload = key === 'flow' ? (data.flow || data.flows) : data[key];
+    if (!payload) return;
     if (key === 'summary' && !data.summary?.bullets?.length) return;
     n += 1;
     const anchor = ANCHORS[key];
@@ -153,7 +157,7 @@
       ]),
     ]);
     main.appendChild(section);
-    try { meta.render(section, data[key]); } catch (err) { console.error(`render ${key} failed`, err); }
+    try { meta.render(section, payload); } catch (err) { console.error(`render ${key} failed`, err); }
   });
 
   // ---------- scroll progress + scroll-spy ----------
@@ -500,7 +504,7 @@
     svgEl.querySelectorAll('g.cluster-label').forEach((g) => {
       if (g.dataset.prShifted) return;
       const cur = g.getAttribute('transform') || '';
-      g.setAttribute('transform', cur + ' translate(0,-15)');
+      g.setAttribute('transform', cur + ' translate(0,-18)');
       g.dataset.prShifted = '1';
     });
 
@@ -512,6 +516,45 @@
       const cur = g.getAttribute('transform') || '';
       g.setAttribute('transform', cur + ' translate(0,-12)');
       g.dataset.prLifted = '1';
+    });
+    // Mermaid 11.x paints a solid rect behind edge labels via an inline
+    // `fill` that survives CSS — and on some configs uses `paint-order:
+    // stroke` on the text to create a thick stroke halo that looks like a
+    // rectangle. Nuke every plausible source from JS so the line shows
+    // through and only the text remains.
+    const KILL_BG_SELECTORS = [
+      'g.edgeLabel rect',
+      'g.edgeLabels rect',
+      'g.edgeLabel g rect',
+      'g.edgeLabel g.label rect',
+      '.labelBkg',
+      '.edgeLabel .background',
+      '.edgeLabel rect.background',
+      'foreignObject .labelBkg',
+    ].join(',');
+    svgEl.querySelectorAll(KILL_BG_SELECTORS).forEach((r) => {
+      r.setAttribute('fill', 'none');
+      r.setAttribute('fill-opacity', '0');
+      r.setAttribute('stroke', 'none');
+      r.style.fill = 'transparent';
+      r.style.stroke = 'none';
+      r.style.background = 'transparent';
+      r.style.backgroundColor = 'transparent';
+    });
+    // Some Mermaid versions render edge labels with paint-order: stroke +
+    // a thick white-ish stroke on the <text>, producing an apparent
+    // rectangle behind the glyphs.
+    svgEl.querySelectorAll('g.edgeLabel text, g.edgeLabel tspan, .edgeLabel text, .edgeLabel tspan').forEach((t) => {
+      t.setAttribute('stroke', 'none');
+      t.style.stroke = 'none';
+      t.style.strokeWidth = '0';
+      t.style.paintOrder = 'normal';
+    });
+    // foreignObject-based labels carry their background on the inner div.
+    svgEl.querySelectorAll('foreignObject *').forEach((d) => {
+      if (!d.style) return;
+      d.style.background = 'transparent';
+      d.style.backgroundColor = 'transparent';
     });
     // Expose the full label as <title> on the rendered text so the
     // truncated 4-word version still surfaces the original on hover.
@@ -754,11 +797,15 @@
     scale = Math.min(scale, 1.4);
     scale = Math.max(scale, 0.5);
     pz.zoomAbs(0, 0, scale);
-    // Center horizontally; pin to top vertically with padding.
     const renderedW = bbox.width * scale;
     const renderedX = (bbox.x - vbX) * scale;
     const renderedY = (bbox.y - vbY) * scale;
-    const offsetX = (cw - renderedW) / 2 - renderedX;
+    // Sequence diagrams read left-to-right; left-anchored fit avoids the
+    // appearance that the first actor is offset. Flowcharts centre by default.
+    const align = container.dataset?.fitAlign || 'center';
+    const offsetX = align === 'left'
+      ? padding - renderedX
+      : (cw - renderedW) / 2 - renderedX;
     const offsetY = padding - renderedY;
     pz.moveTo(offsetX, offsetY);
   }
@@ -786,132 +833,186 @@
     return controls;
   }
 
-  function renderFlow(host, f) {
-    host.appendChild(el('p', {}, 'A real UML sequence — actors at the top, time flows down, each numbered step is a message from one actor to another.'));
+  // Flow is rendered as one Mermaid `sequenceDiagram` per flow. The section
+  // accepts either a singular `flow: { actors, steps }` or a plural
+  // `flows: [{ title?, actors, steps }, ...]` — split each major flow into
+  // its own diagram rather than mashing them together.
+  function renderFlow(host, payload) {
+    const flows = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload && payload.flows)
+        ? payload.flows
+        : [payload];
 
-    if (!f.actors.length) {
+    // No generic UML explainer — each flow carries its own title + summary
+    // so the reviewer reads what the flow does, not how sequence diagrams
+    // work in general.
+    flows.forEach((f, i) => renderOneFlow(host, f, i, flows.length));
+  }
+
+  function renderOneFlow(host, f, idx, total) {
+    if (!f || !Array.isArray(f.actors) || !f.actors.length) {
       host.appendChild(el('p', {}, 'No flow steps to render.'));
       return;
     }
+    if (f.title) {
+      host.appendChild(el('h3', { class: 'flow-mmd__title' },
+        (total > 1 ? `${idx + 1}. ` : '') + f.title));
+    }
+    if (f.summary) host.appendChild(el('p', { class: 'flow-mmd__summary' }, f.summary));
 
-    const headerH = 64, headerGapY = 36, stepGapY = 56, padding = 32, minActorW = 140, actorGapX = 40;
-
-    const wrap     = el('div', { class: 'flow-seq' });
-    const headerRow= el('div', { class: 'flow-seq__actors' });
-    const stage    = el('div', { class: 'flow-seq__stage' });
-    const lifeSvg  = svg('svg', { class: 'flow-seq__lifelines' });
-    const msgSvg   = svg('svg', { class: 'flow-seq__messages' });
-    stage.appendChild(lifeSvg);
-    stage.appendChild(msgSvg);
-    wrap.appendChild(headerRow);
-    wrap.appendChild(stage);
+    const id = 'flow-mmd-' + Math.random().toString(36).slice(2, 9);
+    const wrap = el('div', { class: 'flow-mmd' });
+    // Pin first-fit + fit-button alignment to the left edge — the timeline
+    // flows left-to-right, so an initial centre offset feels wrong.
+    const inner = el('div', { class: 'flow-mmd__inner', 'data-fit-align': 'left' });
+    const hint = el('div', { class: 'mmd-hint' }, 'ctrl + wheel to zoom · drag to pan');
+    const mmdHost = el('pre', { class: 'mermaid', id });
+    inner.appendChild(mmdHost);
+    wrap.appendChild(hint);
+    wrap.appendChild(inner);
+    wrap.appendChild(mmdControls(inner));
     host.appendChild(wrap);
 
-    const actorEls = f.actors.map((a) => {
-      const card = el('div', { class: 'flow-actor', 'data-actor': a.id }, [
-        el('span', { class: 'flow-actor__kind' }, a.kind || ''),
-        el('span', { class: 'flow-actor__label' }, a.label),
-      ]);
-      headerRow.appendChild(card);
-      return { actor: a, card };
+    const renderOnce = () => {
+      mmdHost.textContent = buildSequenceMermaid(f);
+      mmdHost.removeAttribute('data-processed');
+      runMermaidSequence(mmdHost, () => wireFlowPanzoom(mmdHost, inner));
+    };
+    renderOnce();
+    // Theme toggles bake colors into the rendered SVG, so rebuild from source.
+    window.__pro.themeChangeHandlers.push(renderOnce);
+  }
+
+  function wireFlowPanzoom(mmdHost, scrollWrap) {
+    const svgEl = mmdHost.querySelector('svg');
+    if (!svgEl) return;
+    // Pin SVG box to its viewBox so the browser doesn't pre-shrink the
+    // diagram — panzoom is then the only scaler (same trick as the
+    // architecture flowchart).
+    const vbAttr = svgEl.getAttribute('viewBox');
+    if (vbAttr) {
+      const [, , vbW, vbH] = vbAttr.split(/\s+/).map(Number);
+      if (vbW && vbH) {
+        svgEl.style.width  = vbW + 'px';
+        svgEl.style.height = vbH + 'px';
+      }
+    }
+    svgEl.style.maxWidth = 'none';
+    svgEl.style.display = 'block';
+
+    if (typeof window.panzoom === 'function') {
+      // Detach any panzoom from a prior render (theme toggle path) before
+      // attaching a fresh one, otherwise wheel events get double-handled.
+      if (scrollWrap._pz && typeof scrollWrap._pz.dispose === 'function') {
+        try { scrollWrap._pz.dispose(); } catch (_) {}
+      }
+      const pz = window.panzoom(svgEl, {
+        smoothScroll: false,
+        minZoom: 0.3, maxZoom: 4,
+        beforeWheel: (e) => !e.ctrlKey && !e.metaKey,
+      });
+      scrollWrap._pz = pz;
+      requestAnimationFrame(() => fitMermaid(pz, svgEl, scrollWrap));
+    }
+  }
+
+  function buildSequenceMermaid(f) {
+    const sid = (s) => 'a_' + String(s).replace(/[^a-zA-Z0-9_]/g, '_');
+    // Mermaid's sequenceDiagram parser treats `;` and newlines as statement
+    // separators and `#` as a special token — strip / substitute any in
+    // user-supplied labels so a stray punctuation char doesn't poison parsing.
+    const esc = (s) => String(s)
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/;/g, ',')
+      .replace(/[<>]/g, '')
+      .replace(/"/g, "'")
+      .replace(/#/g, '');
+    // Mermaid sequence labels don't wrap natively; keep messages one-line.
+    const trim = (s) => {
+      const t = String(s).trim();
+      return t.length <= 80 ? t : t.slice(0, 77).trimEnd() + '…';
+    };
+    const lines = ['sequenceDiagram', '  autonumber'];
+    f.actors.forEach((a) => {
+      lines.push(`  participant ${sid(a.id)} as ${esc(a.label)}`);
     });
-
-    requestAnimationFrame(() => {
-      const actorW = actorEls.map(({ card }) => Math.max(minActorW, card.offsetWidth));
-      const totalNatural = actorW.reduce((a, b) => a + b, 0) + actorGapX * (actorEls.length - 1);
-      const availW = Math.max(stage.clientWidth - padding * 2, totalNatural);
-      const extra  = Math.max(0, availW - totalNatural);
-      const perGap = actorEls.length > 1 ? extra / (actorEls.length - 1) : 0;
-
-      const actorX = [];
-      let cursor = padding;
-      actorEls.forEach(({ card }, i) => {
-        actorX.push(cursor + actorW[i] / 2);
-        card.style.left = cursor + 'px';
-        card.style.width = actorW[i] + 'px';
-        cursor += actorW[i] + actorGapX + perGap;
-      });
-      const stageW = cursor + padding - actorGapX - perGap;
-      const stageH = headerGapY + stepGapY * f.steps.length + padding;
-
-      stage.style.width = stageW + 'px';
-      stage.style.height = stageH + 'px';
-      [lifeSvg, msgSvg].forEach((s) => {
-        s.setAttribute('width', stageW);
-        s.setAttribute('height', stageH);
-        s.setAttribute('viewBox', `0 0 ${stageW} ${stageH}`);
-      });
-
-      while (lifeSvg.firstChild) lifeSvg.removeChild(lifeSvg.firstChild);
-      actorX.forEach((x) => {
-        const line = svg('line', { x1: x, x2: x, y1: 0, y2: stageH, class: 'flow-seq__lifeline' });
-        lifeSvg.appendChild(line);
-      });
-
-      while (msgSvg.firstChild) msgSvg.removeChild(msgSvg.firstChild);
-      appendArrowDef(msgSvg);
-      const idx = new Map(f.actors.map((a, i) => [a.id, i]));
-      f.steps.forEach((s, i) => {
-        const fi = idx.get(s.from);
-        const ti = idx.get(s.to);
-        if (fi == null || ti == null) return;
-        const y = headerGapY + stepGapY * (i + 0.5);
-        const isSelf = fi === ti;
-        let path, labelX, labelAnchor;
-        if (isSelf) {
-          const x = actorX[fi];
-          path = svg('path', { d: `M ${x} ${y - 8} L ${x + 36} ${y - 8} L ${x + 36} ${y + 8} L ${x + 4} ${y + 8}` });
-          labelX = x + 40; labelAnchor = 'start';
-        } else {
-          const fx = actorX[fi], tx = actorX[ti];
-          path = svg('line', { x1: fx, y1: y, x2: tx, y2: y });
-          const goingRight = tx > fx;
-          labelX = goingRight ? fx + 8 : fx - 8;
-          labelAnchor = goingRight ? 'start' : 'end';
-        }
-        path.setAttribute('marker-end', 'url(#edge-arrow)');
-        path.setAttribute('class', 'flow-seq__msg' + (s.changed ? ' is-changed' : ''));
-        msgSvg.appendChild(path);
-
-        const availW = isSelf ? 140 : Math.abs(actorX[ti] - actorX[fi]) - 16;
-        const maxChars = Math.max(20, Math.floor(availW / 7.2));
-        const display = s.label.length > maxChars ? s.label.slice(0, maxChars - 1) + '…' : s.label;
-        const text = svg('text', { x: labelX, y: y - 6, 'text-anchor': labelAnchor, class: 'flow-seq__label' });
-        text.textContent = display;
-        if (display !== s.label) {
-          const t = svg('title'); t.textContent = s.label; text.appendChild(t);
-        }
-        msgSvg.appendChild(text);
-
-        const num = svg('text', {
-          x: actorX[fi] + (isSelf ? 0 : (actorX[ti] > actorX[fi] ? 10 : -10)),
-          y: y + 4,
-          'text-anchor': isSelf ? 'middle' : (actorX[ti] > actorX[fi] ? 'start' : 'end'),
-          class: 'flow-seq__num',
-        });
-        num.textContent = (i + 1).toString();
-        msgSvg.appendChild(num);
-
-        const hit = svg('rect', {
-          x: Math.min(labelX - 100, actorX[Math.min(fi, ti)]),
-          y: y - 18,
-          width: Math.max(200, Math.abs(actorX[ti] - actorX[fi]) + 40),
-          height: 28,
-          fill: 'transparent',
-        });
-        hit.style.cursor = 'pointer';
-        hit.addEventListener('click', () => {
-          const fromLabel = f.actors[fi]?.label || s.from;
-          const toLabel   = f.actors[ti]?.label || s.to;
-          openDetail(
-            `<h3>Step ${i + 1}: ${escapeHTML(s.label)}</h3>` +
-            `<p><strong>${escapeHTML(fromLabel)}</strong> → <strong>${escapeHTML(toLabel)}</strong></p>` +
-            (s.changed ? `<p><span class="status-chip is-changed">~ changed</span></p>` : '')
-          );
-        });
-        msgSvg.appendChild(hit);
-      });
+    f.steps.forEach((s) => {
+      lines.push(`  ${sid(s.from)} ->> ${sid(s.to)}: ${esc(trim(s.label))}`);
     });
+    return lines.join('\n');
+  }
+
+  function runMermaidSequence(mmdHost, afterRender) {
+    const init = () => {
+      const theme = document.documentElement.getAttribute('data-theme') || 'paper';
+      const paper = theme === 'paper';
+      window.mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'loose',
+        sequence: {
+          useMaxWidth: false,
+          wrap: false,
+          actorMargin: 80,
+          messageMargin: 44,
+          boxMargin: 12,
+          noteMargin: 12,
+          mirrorActors: false,
+        },
+        theme: 'base',
+        themeVariables: paper ? {
+          fontFamily: 'IBM Plex Sans, ui-sans-serif, system-ui, sans-serif',
+          background: '#fbf9f3',
+          primaryColor: '#f0e6cf',
+          primaryBorderColor: '#211e19',
+          primaryTextColor: '#211e19',
+          actorBkg: '#f0e6cf',
+          actorBorder: '#211e19',
+          actorTextColor: '#211e19',
+          actorLineColor: '#5b5347',
+          signalColor: '#211e19',
+          signalTextColor: '#211e19',
+          labelBoxBkgColor: '#fbf9f3',
+          labelBoxBorderColor: '#211e19',
+          labelTextColor: '#211e19',
+          loopTextColor: '#211e19',
+          noteBkgColor: '#b8431a',
+          noteTextColor: '#fbf9f3',
+          noteBorderColor: '#b8431a',
+          activationBkgColor: '#e3ece6',
+          activationBorderColor: '#5b5347',
+          sequenceNumberColor: '#fbf9f3',
+        } : {
+          fontFamily: 'IBM Plex Sans, ui-sans-serif, system-ui, sans-serif',
+          background: '#161b22',
+          primaryColor: '#21262d',
+          primaryBorderColor: '#c9d1d9',
+          primaryTextColor: '#e6edf3',
+          actorBkg: '#21262d',
+          actorBorder: '#c9d1d9',
+          actorTextColor: '#e6edf3',
+          actorLineColor: '#8b949e',
+          signalColor: '#e6edf3',
+          signalTextColor: '#e6edf3',
+          labelBoxBkgColor: '#161b22',
+          labelBoxBorderColor: '#c9d1d9',
+          labelTextColor: '#e6edf3',
+          loopTextColor: '#e6edf3',
+          noteBkgColor: '#b8431a',
+          noteTextColor: '#fbf9f3',
+          noteBorderColor: '#b8431a',
+          activationBkgColor: '#21262d',
+          activationBorderColor: '#8b949e',
+          sequenceNumberColor: '#161b22',
+        },
+      });
+      window.mermaid.run({ nodes: [mmdHost] }).then(afterRender || (() => {}));
+    };
+    if (window.mermaid) init();
+    else {
+      const wait = () => window.mermaid ? init() : setTimeout(wait, 30);
+      wait();
+    }
   }
 
   function renderDatabase(host, d) {

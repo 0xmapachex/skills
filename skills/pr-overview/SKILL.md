@@ -65,7 +65,7 @@ full history.
 | Section            | Trigger (any of)                                                                                                                                                                            |
 |--------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `database`         | Diff touches `*.sql`, `**/migrations/**`, `drizzle/schema.ts`, `prisma/schema.prisma`, ORM model files, seed scripts, or columns referenced in new query projections.                       |
-| `flow`             | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" |
+| `flow` / `flows`   | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" Use `flows: []` (one entry per major flow) whenever the PR ships more than one independent flow — never combine them into a single tangled diagram. Reserve singular `flow: {}` for the single-flow case. |
 | `risk_rollout`     | `database` is present OR diff touches `infra/`, `Dockerfile`, `vercel.ts`/`vercel.json`, GitHub workflows, IAM, or env-var defaults.                                                        |
 | `code_observations`| Agent spots: (a) ≥3 near-duplicate blocks across the diff, (b) a TODO/FIXME added, (c) a silently-swallowed error, (d) a comment that contradicts the code, or (e) a hardcoded value that looks env-specific. **Cap at 5 items.** If more, surface a closing item: `"more observations available — run /review for a full audit"`. |
 
@@ -115,6 +115,30 @@ Key invariants:
   intentionally narrower than architecture node kinds (no `ui` or `job`
   here; use `service` for those actors when their architectural kind is
   `ui` or `job`).
+- Flows render as **Mermaid `sequenceDiagram`s — one per major flow.** Use
+  the plural `flows: [ { title, summary, actors, steps }, ... ]` whenever
+  the PR ships more than one independent flow. Split criteria: distinct
+  entry point (different route / webhook / cron / user action), distinct
+  set of actors, or distinct outcome. Don't merge unrelated flows just to
+  reuse actors.
+- **Every flow MUST have a `title` and a `summary`** — single-flow case
+  included. They are the framing the reviewer reads before the diagram;
+  without them the section opens with no context. (Required by the prompt;
+  the schema marks them optional only so legacy specs still validate.)
+  - `title` — a verb phrase that names what the flow accomplishes:
+    "Editor/Viewer first-run onboarding", "Nightly invoice rollup",
+    "Slack OAuth callback → workspace bind". Not "How it flows", not
+    "The flow", not "Sequence diagram".
+  - `summary` — one sentence (≤ 180 chars) that says (a) what triggers
+    the flow, (b) what changes as a result, and (c) what this PR
+    specifically did to it. Example: "Triggered on first sign-in for any
+    seeded editor/viewer; gated by `requireOnboardedOrRedirect`. This PR
+    introduces the full 4-step path and the `dashboard_users.onboarded_at`
+    backfill that prevents existing users from seeing it."
+- Keep step labels ≤ 80 characters — they don't wrap in the diagram (the
+  renderer truncates with an ellipsis past that). Avoid `;` in step labels
+  — Mermaid treats it as a statement separator; the renderer substitutes
+  it with `,` to keep parsing safe, but it's clearer to phrase around it.
 
 ## Output
 

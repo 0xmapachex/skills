@@ -695,66 +695,41 @@ div.node--draggable.is-dragging { cursor: grabbing; }
 .field-row.is-removed { border-left-color: var(--removed); background: var(--removed-tint); }
 .field-row.is-privacy { box-shadow: inset 3px 0 0 var(--privacy); }
 
-/* ---------- Flow (UML sequence diagram) ---------- */
-.flow-seq {
+/* ---------- Flow (Mermaid sequenceDiagram, one per major flow) ---------- */
+.flow-mmd__title {
+  font-family: var(--serif, 'Fraunces', Georgia, serif);
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+  margin: 32px 0 4px;
+}
+.flow-mmd__title:first-child { margin-top: 18px; }
+.flow-mmd__summary {
+  color: var(--ink-soft); font-size: 14.5px; margin: 0 0 12px;
+}
+.flow-mmd {
+  position: relative;
   border: 1px solid var(--line); border-radius: 12px;
-  background:
-    radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0)
-    0 0 / 24px 24px var(--surface);
-  margin-top: 26px;
-  overflow-x: auto;
-  box-shadow: var(--shadow);
-}
-.flow-seq__actors {
-  position: relative; height: 64px;
-  border-bottom: 1px solid var(--line);
-  background: var(--paper-tint);
-}
-.flow-actor {
-  position: absolute; top: 10px;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: var(--surface);
-  border: 1px solid var(--ink-faint); border-radius: 6px;
-  padding: 8px 14px;
-  font-family: var(--mono); font-size: 12px;
+  margin-top: 14px;
+  overflow: hidden;
   box-shadow: var(--shadow);
 }
-.flow-actor__kind {
-  font-size: 9.5px; color: var(--ink-faint);
-  text-transform: uppercase; letter-spacing: .05em;
+.flow-mmd__inner {
+  position: relative;
+  width: 100%; height: 480px;
+  overflow: hidden;
+  cursor: grab;
 }
-.flow-actor__label {
-  font-weight: 600; color: var(--ink);
-  margin-top: 2px;
+.flow-mmd__inner:active { cursor: grabbing; }
+.flow-mmd__inner .mermaid {
+  transform-origin: 0 0;
+  padding: 16px;
+  white-space: normal;
 }
-.flow-seq__stage { position: relative; }
-.flow-seq__lifelines, .flow-seq__messages {
-  position: absolute; top: 0; left: 0;
-  overflow: visible;
-}
-.flow-seq__lifelines { pointer-events: none; }
-.flow-seq__messages { pointer-events: auto; }
-.flow-seq__messages rect { pointer-events: auto; }
-.flow-seq__lifeline {
-  stroke: var(--line); stroke-width: 1.5; stroke-dasharray: 4 6;
-}
-.flow-seq__msg {
-  stroke: var(--ink-soft); stroke-width: 1.6; fill: none;
-}
-.flow-seq__msg.is-changed {
-  stroke: var(--changed); stroke-width: 2;
-}
-.flow-seq__label {
-  fill: var(--ink); font-size: 12.5px;
-  font-family: var(--mono);
-  paint-order: stroke;
-  stroke: var(--surface); stroke-width: 4px;
-}
-.flow-seq__num {
-  fill: var(--accent); font-size: 10px; font-weight: 500;
-  font-family: var(--mono);
-  paint-order: stroke;
-  stroke: var(--surface); stroke-width: 3px;
+.flow-mmd__inner svg {
+  background: transparent !important;
+  display: block;
 }
 
 /* ---------- timeline ---------- */

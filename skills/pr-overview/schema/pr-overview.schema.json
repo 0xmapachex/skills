@@ -74,6 +74,8 @@
       "type": "object",
       "required": ["actors", "steps"],
       "properties": {
+        "title":   { "type": "string" },
+        "summary": { "type": "string" },
         "actors": {
           "type": "array",
           "items": {
@@ -101,6 +103,11 @@
           }
         }
       }
+    },
+    "flows": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/properties/flow" }
     },
     "database": {
       "type": "object",

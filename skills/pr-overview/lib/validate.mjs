@@ -29,17 +29,19 @@ export function validate(spec) {
 
   // allowed top-level keys only
   const ALLOWED = new Set([
-    'meta', 'summary', 'architecture', 'flow', 'database',
+    'meta', 'summary', 'architecture', 'flow', 'flows', 'database',
     'code_observations', 'risk_rollout', 'open_questions',
   ]);
   for (const k of Object.keys(spec)) {
     if (!ALLOWED.has(k)) push('$', `unknown key: ${k}`);
   }
+  if ('flow' in spec && 'flows' in spec) push('$', 'use either flow (single) or flows (array), not both');
 
   if ('meta' in spec)              validateMeta(spec.meta, push);
   if ('summary' in spec)           validateSummary(spec.summary, push);
   if ('architecture' in spec)      validateArchitecture(spec.architecture, push);
-  if ('flow' in spec)              validateFlow(spec.flow, push);
+  if ('flow' in spec)              validateFlow(spec.flow, push, 'flow');
+  if ('flows' in spec)             validateFlows(spec.flows, push);
   if ('database' in spec)          validateDatabase(spec.database, push);
   if ('code_observations' in spec) validateCodeObservations(spec.code_observations, push);
   if ('risk_rollout' in spec)      validateRiskRollout(spec.risk_rollout, push);
@@ -100,22 +102,30 @@ function validateArchitecture(a, push) {
   }
 }
 
-function validateFlow(f, push) {
-  if (!isObj(f)) { push('flow', 'must be object'); return; }
-  if (!Array.isArray(f.actors)) push('flow.actors', 'must be array');
+function validateFlow(f, push, path) {
+  if (!isObj(f)) { push(path, 'must be object'); return; }
+  if ('title'   in f && !isStr(f.title))   push(`${path}.title`, 'must be string');
+  if ('summary' in f && !isStr(f.summary)) push(`${path}.summary`, 'must be string');
+  if (!Array.isArray(f.actors)) push(`${path}.actors`, 'must be array');
   else f.actors.forEach((a, i) => {
-    const p = `flow.actors[${i}]`;
+    const p = `${path}.actors[${i}]`;
     if (!isStr(a.id)) push(`${p}.id`, 'required string');
     if (!isStr(a.label)) push(`${p}.label`, 'required string');
     if ('kind' in a && !ACTOR_KINDS.has(a.kind)) push(`${p}.kind`, `must be one of ${[...ACTOR_KINDS].join('|')}`);
   });
-  if (!Array.isArray(f.steps)) push('flow.steps', 'must be array');
+  if (!Array.isArray(f.steps)) push(`${path}.steps`, 'must be array');
   else f.steps.forEach((s, i) => {
-    const p = `flow.steps[${i}]`;
+    const p = `${path}.steps[${i}]`;
     if (!isStr(s.from)) push(`${p}.from`, 'required string');
     if (!isStr(s.to)) push(`${p}.to`, 'required string');
     if (!isStr(s.label)) push(`${p}.label`, 'required string');
   });
+}
+
+function validateFlows(flows, push) {
+  if (!Array.isArray(flows)) { push('flows', 'must be array'); return; }
+  if (flows.length < 1) push('flows', 'must have at least one flow');
+  flows.forEach((f, i) => validateFlow(f, push, `flows[${i}]`));
 }
 
 function validateDatabase(d, push) {
