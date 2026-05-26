@@ -525,18 +525,42 @@ details.spec summary .dot {
   text-transform: uppercase;
   fill: var(--ink) !important;
 }
+/* Edge labels — transparent background everywhere (the SVG rect, the HTML
+   wrapper, and every inner span). To keep text readable where the edge
+   crosses underneath, paint a thick "halo" in the canvas surface color
+   using text-shadow, so the edge line is visually broken beneath the
+   label. Same technique a real UML diagram uses, no sticker blocks. */
+.mmd-inner svg .edgeLabel,
+.mmd-inner svg .edgeLabel *,
+.mmd-inner svg foreignObject .edgeLabel,
+.mmd-inner svg .edgeLabels .edgeLabel {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+.mmd-inner svg .labelBkg,
+.mmd-inner svg .edgeLabel rect.labelBkg,
+.mmd-inner svg .edgePath .edgeLabel rect {
+  fill: transparent !important;
+}
 .mmd-inner svg .edgeLabel {
   font-family: var(--mono) !important;
   font-size: 11.5px !important;
-  background: transparent !important;
   padding: 0 !important;
   border-radius: 0;
 }
-/* Kill ONLY the rect Mermaid paints behind each edge label.
-   Do not touch the text container — that hides the label itself. */
-.mmd-inner svg .labelBkg,
-.mmd-inner svg .edgeLabel rect.labelBkg {
-  fill: transparent !important;
+.mmd-inner svg .edgeLabel,
+.mmd-inner svg .edgeLabel span,
+.mmd-inner svg .edgeLabel p,
+.mmd-inner svg .edgeLabel div {
+  text-shadow:
+    -2px -2px 0 var(--surface),
+     2px -2px 0 var(--surface),
+    -2px  2px 0 var(--surface),
+     2px  2px 0 var(--surface),
+     0   -2px 0 var(--surface),
+     0    2px 0 var(--surface),
+    -2px  0   0 var(--surface),
+     2px  0   0 var(--surface);
 }
 .mmd-inner svg .node[id*="n_"] rect,
 .mmd-inner svg .node[id*="n_"] polygon {
