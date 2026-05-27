@@ -1357,8 +1357,10 @@
     (payload.groups || []).forEach((group) => {
       const g = el('div', { class: 'routes-group' });
       g.appendChild(el('h4', {}, group.title));
-      (group.routes || []).forEach((route, i) => {
-        g.appendChild(renderRouteRow(route, i === 0 && route.status !== 'removed'));
+      (group.routes || []).forEach((route) => {
+        // All endpoints collapsed by default — reviewers scan paths first,
+        // then expand individual routes to read parameters / responses.
+        g.appendChild(renderRouteRow(route, false));
       });
       panel.appendChild(g);
     });

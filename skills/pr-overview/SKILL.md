@@ -244,20 +244,64 @@ additive schema change has a migration story.
 
 3. **New/removed/changed API routes / server actions.**
 
+   The first reflex — `awk '$1=="A"'` — finds **only added files**. It misses
+   three failure modes that all hit in real PRs:
+
+   - **Removed endpoints inside a modified file.** A route file gets
+     `M` in name-status when most of it stays but one handler is deleted.
+     A `awk '$1=="A"'` filter never looks inside.
+   - **Added endpoints inside a modified file.** Same problem in reverse —
+     a new `router.post(...)` lives in an `M` file, not an `A` one.
+   - **Changed handler bodies (new params, new error codes, renamed
+     replacement URLs).** These leave the route line unchanged but
+     materially alter the contract — the kind of thing a reviewer must
+     see before approving.
+
+   So check all three statuses in one pass, then grep the diff bodies of
+   modified files for added/removed handler lines:
+
    ```bash
+   # 1. List touched route/action files by status.
    git diff <base>...HEAD --name-status \
-     -- 'apps/*/src/app/api/**/route.ts' 'apps/*/src/app/**/actions.ts' \
-     | awk '$1=="A"{print $2}'
+     -- 'apps/*/src/app/api/**/route.ts' \
+        'apps/*/src/app/**/actions.ts' \
+        'services/**/routes/**/*.ts' \
+        'services/**/handlers/**/*.ts'
+   #   A = added file, M = modified, D = deleted, R = renamed.
+
+   # 2. Inside MODIFIED files, find added handler lines (new endpoints
+   #    bolted onto an existing router).
+   git diff <base>...HEAD -- '<modified-route-file>' \
+     | grep -E '^\+[^+].*\.(get|post|put|patch|delete)\("'
+
+   # 3. Inside MODIFIED files, find REMOVED handler lines (deleted
+   #    endpoints — often "moved to /v1/owner/..." or dedup cleanups).
+   git diff <base>...HEAD -- '<modified-route-file>' \
+     | grep -E '^-[^-].*\.(get|post|put|patch|delete)\("'
    ```
 
-   Each new `route.ts` is either a `summary.ships` item, if it is a
-   user-visible capability, or a `summary.changes` item, if it backs an
-   existing surface. Server actions follow the surface they support.
+   Each finding lands in the spec as follows:
+   - A *new* `route.ts` is either a `summary.ships` item (user-visible
+     capability) or a `summary.changes` item (backs an existing surface).
+     Server actions follow the surface they support.
+   - A *modified* handler is a `Changed · …` group entry — call out the
+     new param, new error code, contract diff, or renamed dependency.
+     `PATCH /:id` whose error-detail string now points at a different URL
+     is a contract change reviewers need to see.
+   - A *removed* handler is a `Removed · …` group entry — always with a
+     `replacement` field. Watch for **dedup removals**: the same route
+     existed at two paths and one was retired (`/v1/payments/:id/correct`
+     → `/v1/owner/payments/:id/correct`). Confirm the replacement
+     actually still exists on the head ref before claiming it as the
+     successor:
 
-   If the PR adds/removes/changes route handlers, include the optional
-   `routes` section. Build it from the diff range, not from route files that
-   already exist on the base branch. The section should be compact by
-   default and put detail inside each expandable route:
+     ```bash
+     git show <head>:<replacement-file> | grep -nE '\.(get|post|put|patch|delete)\("/<path>"'
+     ```
+
+   Build the `routes` section from the diff range, not from route files
+   that already exist on the base branch. The section is compact by
+   default and puts detail inside each expandable route:
    - method + path + status (`added`, `changed`, `removed`)
    - 1-line purpose/summary
    - auth/tenancy notes when meaningful
@@ -266,7 +310,12 @@ additive schema change has a migration story.
    - request body as a Swagger-like body object with example JSON for
      body-bearing routes
    - response codes with example JSON, especially success and validation/error
-   - replacement route for removed endpoints
+   - `replacement` for removed endpoints (verified to exist on HEAD)
+
+   **`routes.stats` must match what the spec actually contains.** If
+   stats says `removed: 0` but the diff has deleted handler lines, the
+   stats are wrong, not the diff. Recompute stats after editing the
+   groups; don't carry over a stale count from an earlier pass.
 
 4. **New or removed agent tools.**
 
