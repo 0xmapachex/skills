@@ -122,6 +122,7 @@
     architecture:      { label: 'The big picture',  render: renderArchitecture },
     flow:              { label: 'How it flows',     render: renderFlow },
     database:          { label: 'Database changes', render: renderDatabase },
+    routes:            { label: 'Routes touched',   render: renderRoutes },
     risk_rollout:      { label: 'Risk & rollout',   render: renderRiskRollout },
     open_questions:    { label: 'Open questions',   render: renderOpenQuestions },
   };
@@ -133,6 +134,7 @@
     architecture:      'section-architecture',
     flow:              'section-flow',
     database:          'section-database',
+    routes:            'section-routes',
     risk_rollout:      'section-risk-rollout',
     open_questions:    'section-open-questions',
   };
@@ -164,7 +166,7 @@
 
     // section
     const section = el('section', {
-      class: 'section' + (key === 'architecture' || key === 'flow' || key === 'database' || key === 'screenshots' ? ' section--wide' : ''),
+      class: 'section' + (key === 'architecture' || key === 'flow' || key === 'database' || key === 'routes' || key === 'screenshots' ? ' section--wide' : ''),
       id: anchor,
     }, [
       el('div', { class: 'kicker' }, [
@@ -1323,6 +1325,184 @@
         <h4>Fields</h4><ul>${fields}</ul>
       `;
     }
+  }
+
+  // ---------- routes ----------
+  // Compact route-delta section. It is intentionally accordion-heavy: reviewers
+  // can scan the route groups, then expand one endpoint to see parameters,
+  // body examples, response examples, files, tests, and review notes.
+  function renderRoutes(host, payload) {
+    if (payload.summary) {
+      const p = el('p', { class: 'arch-summary' });
+      appendInlineCode(p, payload.summary);
+      host.appendChild(p);
+    }
+
+    const panel = el('div', { class: 'routes-panel' });
+    const head = el('div', { class: 'routes-panel__head' }, [
+      el('div', {}, [
+        el('h3', {}, 'API routes touched'),
+        el('p', {}, 'Grouped by product surface. Expand a route for input and response details.'),
+      ]),
+      renderRouteStats(payload.stats || {}),
+    ]);
+    panel.appendChild(head);
+
+    if (payload.scope_note) {
+      const note = el('p', { class: 'routes-panel__note' });
+      appendInlineCode(note, payload.scope_note);
+      panel.appendChild(note);
+    }
+
+    (payload.groups || []).forEach((group) => {
+      const g = el('div', { class: 'routes-group' });
+      g.appendChild(el('h4', {}, group.title));
+      (group.routes || []).forEach((route, i) => {
+        g.appendChild(renderRouteRow(route, i === 0 && route.status !== 'removed'));
+      });
+      panel.appendChild(g);
+    });
+
+    host.appendChild(panel);
+  }
+
+  function renderRouteStats(stats) {
+    const wrap = el('div', { class: 'routes-stats', 'aria-label': 'Route delta summary' });
+    const chip = (label, cls) => el('span', { class: `route-chip${cls ? ` ${cls}` : ''}` }, label);
+    if (Number.isFinite(stats.added)) wrap.appendChild(chip(`+${stats.added} added`, 'is-added'));
+    if (Number.isFinite(stats.removed)) wrap.appendChild(chip(`−${stats.removed} removed`, 'is-removed'));
+    if (Number.isFinite(stats.net)) wrap.appendChild(chip(`${stats.net >= 0 ? '+' : ''}${stats.net} net`, ''));
+    if (Number.isFinite(stats.changed)) wrap.appendChild(chip(`${stats.changed} changed`, 'is-changed'));
+    return wrap;
+  }
+
+  function renderRouteRow(route, open = false) {
+    const details = el('details', { class: `route-row is-${route.status}` });
+    if (open) details.setAttribute('open', '');
+    details.appendChild(el('summary', {}, [
+      el('span', { class: `route-method is-${route.method}` }, route.method),
+      el('span', { class: 'route-path' }, route.path),
+      el('span', { class: `status-chip is-${route.status}` }, route.status),
+    ]));
+
+    const body = el('div', { class: 'route-row__body' });
+    body.appendChild(renderRouteFacts(route));
+    if (Array.isArray(route.parameters) && route.parameters.length) {
+      body.appendChild(renderRouteParameters(route.parameters));
+    }
+    if (route.request_body) {
+      body.appendChild(renderRouteBody(route.request_body));
+    }
+    if (Array.isArray(route.responses) && route.responses.length) {
+      body.appendChild(renderRouteResponses(route.responses));
+    }
+    details.appendChild(body);
+    return details;
+  }
+
+  function renderRouteFacts(route) {
+    const dl = el('dl', { class: 'route-facts' });
+    const add = (k, v, mode) => {
+      if (v == null || (Array.isArray(v) && v.length === 0)) return;
+      dl.appendChild(el('dt', {}, k));
+      const dd = el('dd', {});
+      if (Array.isArray(v)) {
+        v.forEach((item) => dd.appendChild(el('span', { class: mode === 'file' ? 'file-chip' : 'route-mini-chip' }, item)));
+      } else {
+        appendInlineCode(dd, v);
+      }
+      dl.appendChild(dd);
+    };
+    add('Why', route.summary);
+    add('Details', route.details);
+    add('Auth', route.auth);
+    add('Data', route.data);
+    add('Replacement', route.replacement);
+    add('Files', route.files, 'file');
+    add('Tests', route.tests, 'test');
+    add('Reviewer focus', route.review_focus);
+    return dl;
+  }
+
+  function renderRouteParameters(parameters) {
+    const spec = el('div', { class: 'route-spec' }, [el('h5', {}, 'Parameters')]);
+    const table = el('table', { class: 'route-param-table' }, [
+      el('thead', {}, el('tr', {}, [
+        el('th', {}, 'Name'),
+        el('th', {}, 'In'),
+        el('th', {}, 'Required'),
+        el('th', {}, 'Description'),
+      ])),
+      el('tbody'),
+    ]);
+    const tbody = table.querySelector('tbody');
+    parameters.forEach((p) => {
+      const desc = el('td', {});
+      appendInlineCode(desc, `${p.type ? `${p.type} — ` : ''}${p.description || ''}`);
+      tbody.appendChild(el('tr', {}, [
+        el('td', {}, el('code', {}, p.name)),
+        el('td', {}, p.in),
+        el('td', {}, p.required ? 'yes' : 'no'),
+        desc,
+      ]));
+    });
+    spec.appendChild(table);
+    return spec;
+  }
+
+  function renderRouteBody(body) {
+    const spec = el('div', { class: 'route-spec' }, [el('h5', {}, 'Input')]);
+    const row = el('div', { class: 'route-body-param' });
+    row.appendChild(el('div', { class: 'route-body-param__name' }, [
+      el('code', {}, [
+        'body',
+        body.required ? el('span', { class: 'route-required' }, '* required') : null,
+      ]),
+      el('span', {}, body.type || 'object'),
+      el('em', {}, '(body)'),
+    ]));
+    const content = el('div', { class: 'route-body-param__content' }, [
+      el('p', {}, body.description || ''),
+      el('div', { class: 'route-example-tabs' }, [
+        el('strong', {}, 'Example Value'),
+        el('span', {}, ' | Model'),
+      ]),
+      renderRouteExample(body.example),
+      el('label', { class: 'route-content-type' }, [
+        'Parameter content type',
+        el('select', {}, el('option', {}, body.content_type || 'application/json')),
+      ]),
+    ]);
+    row.appendChild(content);
+    spec.appendChild(row);
+    return spec;
+  }
+
+  function renderRouteResponses(responses) {
+    const spec = el('div', { class: 'route-spec' }, [el('h5', {}, 'Responses')]);
+    responses.forEach((r) => {
+      const card = el('div', { class: `route-response${String(r.code).startsWith('2') ? '' : ' is-error'}` }, [
+        el('div', { class: 'route-response__head' }, [
+          el('span', {}, `${r.code} ${r.description}`),
+          el('span', {}, r.content_type || 'application/json'),
+        ]),
+      ]);
+      if (r.example !== undefined) card.appendChild(renderRouteExample(r.example));
+      spec.appendChild(card);
+    });
+    return spec;
+  }
+
+  function renderRouteExample(value) {
+    const pre = el('pre', { class: 'route-code' });
+    if (value === undefined) {
+      pre.textContent = '{}';
+    } else if (typeof value === 'string') {
+      pre.textContent = value;
+    } else {
+      pre.textContent = JSON.stringify(value, null, 2);
+    }
+    return pre;
   }
 
   function renderRiskRollout(host, r) {
