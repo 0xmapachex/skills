@@ -93,6 +93,7 @@ full history.
 | `flow` / `flows`   | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" Use `flows: []` (one entry per major flow) whenever the PR ships more than one independent flow — never combine them into a single tangled diagram. Reserve singular `flow: {}` for the single-flow case. |
 | `risk_rollout`     | `database` is present OR diff touches `infra/`, `Dockerfile`, `vercel.ts`/`vercel.json`, GitHub workflows, IAM, or env-var defaults.                                                        |
 | `screenshots`      | **REQUIRED when pre-render check #2 returns ≥1 new `page.tsx` (or framework equivalent).** Also when the diff redesigns existing pages (≥1 `page.tsx` modified with ≥30% line change). Skip only for pure refactors, backend-only diffs, or one-line copy edits — and when skipping despite a check #2 hit, `open_questions` MUST record why (e.g. "dev stack unreachable in CI agent"). See check #8. |
+| `routes`           | Diff adds, removes, or materially changes API route handlers, RPC endpoints, app route handlers, server actions that are treated as endpoints, or route-mounted sub-apps. Include only PR-delta routes; do not list unchanged existing routes unless they are replacements for a removed route. |
 
 ## Screenshots
 
@@ -241,7 +242,7 @@ additive schema change has a migration story.
    components. Nested pages under one route family may be folded into one
    ship only when the spec says so plainly.
 
-3. **New API routes / server actions.**
+3. **New/removed/changed API routes / server actions.**
 
    ```bash
    git diff <base>...HEAD --name-status \
@@ -252,6 +253,20 @@ additive schema change has a migration story.
    Each new `route.ts` is either a `summary.ships` item, if it is a
    user-visible capability, or a `summary.changes` item, if it backs an
    existing surface. Server actions follow the surface they support.
+
+   If the PR adds/removes/changes route handlers, include the optional
+   `routes` section. Build it from the diff range, not from route files that
+   already exist on the base branch. The section should be compact by
+   default and put detail inside each expandable route:
+   - method + path + status (`added`, `changed`, `removed`)
+   - 1-line purpose/summary
+   - auth/tenancy notes when meaningful
+   - files/tests touched
+   - parameters for query/path/header inputs
+   - request body as a Swagger-like body object with example JSON for
+     body-bearing routes
+   - response codes with example JSON, especially success and validation/error
+   - replacement route for removed endpoints
 
 4. **New or removed agent tools.**
 
@@ -357,6 +372,21 @@ lives in `schema/pr-overview.schema.json`.
 Key invariants:
 
 - Optional sections are omitted entirely when absent — never present-but-empty.
+- `routes` is the compact endpoint review surface. Use it when route diffs
+  exist, and keep the top-level route list short. Put verbose request/response
+  information inside each route's expandable row.
+  - `routes.stats` is optional but recommended: `{ "added": 3, "removed": 5, "changed": 3, "net": -2 }`.
+  - `routes.scope_note` should call out route families that look related but
+    are unchanged on the base branch, so reviewers do not confuse existing
+    context with PR additions.
+  - `routes.groups[]` groups by product surface, e.g. "Added · Analytics",
+    "Removed · Duplicate endpoints", "Changed · Existing routes".
+  - `parameters[]` is for query/path/header fields. For POST/PATCH body
+    payloads, prefer `request_body` with an `example` object instead of listing
+    every body field as table rows.
+  - `responses[]` should include at least a representative `2xx` response
+    and one important `4xx`/`5xx` when the route has notable validation or
+    authorization behavior.
 - Status enum (`added | changed | removed | context`) is shared across
   architecture details and database tables/fields and drives the visual
   coloring uniformly.

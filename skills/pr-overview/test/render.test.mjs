@@ -103,3 +103,10 @@ test('JS source registers screenshots section + lightbox', () => {
   assert.ok(html.includes('section-screenshots'), 'screenshots anchor missing');
   assert.ok(html.includes('data-image-zoom'), 'lightbox hook missing');
 });
+
+test('JS source registers routes section renderer', () => {
+  const html = renderToString(FIXTURE);
+  assert.ok(html.includes('section-routes'), 'routes anchor missing');
+  assert.ok(html.includes('renderRoutes'), 'routes renderer missing');
+  assert.ok(html.includes('route-body-param'), 'route body UI class missing');
+});

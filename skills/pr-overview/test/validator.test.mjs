@@ -126,6 +126,66 @@ test('accepts inline images on summary.topics', () => {
   assert.deepEqual(validate(ok).errors, []);
 });
 
+test('accepts routes section with query params, body, responses, and stats', () => {
+  const ok = JSON.parse(JSON.stringify(FIXTURE));
+  ok.routes = {
+    summary: 'This PR adds one endpoint and changes another.',
+    scope_note: '`/v1/old` already exists on the base branch.',
+    stats: { added: 1, removed: 0, changed: 1, net: 1 },
+    groups: [
+      {
+        title: 'Added · API',
+        routes: [
+          {
+            method: 'GET',
+            path: '/v1/things',
+            status: 'added',
+            summary: 'Lists things.',
+            parameters: [
+              { name: 'q', in: 'query', required: false, type: 'string', description: 'Search query.' },
+            ],
+            responses: [
+              { code: '200', description: 'successful operation', content_type: 'application/json', example: { items: [] } },
+            ],
+          },
+          {
+            method: 'POST',
+            path: '/v1/things',
+            status: 'changed',
+            summary: 'Creates a thing.',
+            request_body: {
+              required: true,
+              type: 'object',
+              description: 'Thing create body.',
+              content_type: 'application/json',
+              example: { name: 'thing' },
+            },
+            responses: [
+              { code: '200', description: 'successful operation', example: { ok: true } },
+              { code: '400', description: 'validation error', example: { error: 'validation_failed' } },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(validate(ok).errors, []);
+});
+
+test('rejects routes item with invalid method', () => {
+  const bad = JSON.parse(JSON.stringify(FIXTURE));
+  bad.routes = {
+    groups: [
+      {
+        title: 'Bad',
+        routes: [{ method: 'FETCH', path: '/v1/nope', status: 'added', summary: 'Nope.' }],
+      },
+    ],
+  };
+  const { errors } = validate(bad);
+  assert.ok(errors.some((e) => /routes\.groups\[0\]\.routes\[0\]\.method/.test(e)), errors.join('\n'));
+});
+
 test('rejects more than 12 images in a single list', () => {
   const bad = JSON.parse(JSON.stringify(FIXTURE));
   bad.screenshots = {

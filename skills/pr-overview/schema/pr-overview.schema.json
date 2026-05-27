@@ -30,6 +30,62 @@
       "type": "array",
       "maxItems": 12,
       "items": { "$ref": "#/$defs/image" }
+    },
+    "routeParameter": {
+      "type": "object",
+      "required": ["name", "in", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "name":        { "type": "string", "minLength": 1 },
+        "in":          { "enum": ["path", "query", "body", "header"] },
+        "required":    { "type": "boolean" },
+        "type":        { "type": "string" },
+        "description": { "type": "string" }
+      }
+    },
+    "routeBody": {
+      "type": "object",
+      "required": ["description"],
+      "additionalProperties": false,
+      "properties": {
+        "required":     { "type": "boolean" },
+        "type":         { "type": "string" },
+        "description":  { "type": "string" },
+        "content_type": { "type": "string" },
+        "example":      {}
+      }
+    },
+    "routeResponse": {
+      "type": "object",
+      "required": ["code", "description"],
+      "additionalProperties": false,
+      "properties": {
+        "code":         { "type": "string", "minLength": 1 },
+        "description":  { "type": "string" },
+        "content_type": { "type": "string" },
+        "example":      {}
+      }
+    },
+    "routeItem": {
+      "type": "object",
+      "required": ["method", "path", "status", "summary"],
+      "additionalProperties": false,
+      "properties": {
+        "method":        { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
+        "path":          { "type": "string", "minLength": 1 },
+        "status":        { "enum": ["added", "changed", "removed"] },
+        "summary":       { "type": "string", "minLength": 1 },
+        "details":       { "type": "string" },
+        "auth":          { "type": "string" },
+        "data":          { "type": "string" },
+        "replacement":   { "type": "string" },
+        "review_focus":  { "type": "string" },
+        "files":         { "type": "array", "items": { "type": "string" } },
+        "tests":         { "type": "array", "items": { "type": "string" } },
+        "parameters":    { "type": "array", "items": { "$ref": "#/$defs/routeParameter" } },
+        "request_body":  { "$ref": "#/$defs/routeBody" },
+        "responses":     { "type": "array", "items": { "$ref": "#/$defs/routeResponse" } }
+      }
     }
   },
   "properties": {
@@ -225,6 +281,43 @@
               "from":   { "type": "string" },
               "to":     { "type": "string" },
               "status": { "enum": ["added", "changed", "removed", "context"] }
+            }
+          }
+        }
+      }
+    },
+    "routes": {
+      "type": "object",
+      "required": ["groups"],
+      "description": "Compact route-delta section. Include only when the PR adds, removes, or materially changes route handlers.",
+      "additionalProperties": false,
+      "properties": {
+        "summary": { "type": "string" },
+        "scope_note": { "type": "string" },
+        "stats": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "added":   { "type": "integer" },
+            "removed": { "type": "integer" },
+            "changed": { "type": "integer" },
+            "net":     { "type": "integer" }
+          }
+        },
+        "groups": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["title", "routes"],
+            "additionalProperties": false,
+            "properties": {
+              "title": { "type": "string", "minLength": 1 },
+              "routes": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/$defs/routeItem" }
+              }
             }
           }
         }

@@ -6,6 +6,9 @@ const NODE_KINDS = new Set(['service', 'module', 'datastore', 'external', 'ui', 
 const EDGE_KINDS = new Set(['sync', 'async', 'data']);
 const ACTOR_KINDS = new Set(['user', 'service', 'module', 'datastore', 'external']);
 const SEVERITY = new Set(['info', 'watch', 'careful']);
+const ROUTE_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
+const ROUTE_STATUSES = new Set(['added', 'changed', 'removed']);
+const ROUTE_PARAM_IN = new Set(['path', 'query', 'body', 'header']);
 
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const isStr = (v) => typeof v === 'string' && v.length > 0;
@@ -29,7 +32,7 @@ export function validate(spec) {
   // allowed top-level keys only
   const ALLOWED = new Set([
     'meta', 'summary', 'architecture', 'flow', 'flows', 'database',
-    'risk_rollout', 'open_questions', 'screenshots',
+    'routes', 'risk_rollout', 'open_questions', 'screenshots',
   ]);
   for (const k of Object.keys(spec)) {
     if (!ALLOWED.has(k)) push('$', `unknown key: ${k}`);
@@ -42,6 +45,7 @@ export function validate(spec) {
   if ('flow' in spec)              validateFlow(spec.flow, push, 'flow');
   if ('flows' in spec)             validateFlows(spec.flows, push);
   if ('database' in spec)          validateDatabase(spec.database, push);
+  if ('routes' in spec)            validateRoutes(spec.routes, push);
   if ('screenshots' in spec)       validateScreenshots(spec.screenshots, push);
   if ('risk_rollout' in spec)      validateRiskRollout(spec.risk_rollout, push);
   if ('open_questions' in spec)    validateOpenQuestions(spec.open_questions, push);
@@ -241,6 +245,78 @@ function validateDatabase(d, push) {
       if ('status' in r && !STATUS.has(r.status)) push(`${p}.status`, `must be one of ${[...STATUS].join('|')}`);
     });
   }
+}
+
+function validateRoutes(r, push) {
+  if (!isObj(r)) { push('routes', 'must be object'); return; }
+  if ('summary' in r && !isStr(r.summary)) push('routes.summary', 'must be string');
+  if ('scope_note' in r && !isStr(r.scope_note)) push('routes.scope_note', 'must be string');
+  if ('stats' in r) {
+    if (!isObj(r.stats)) push('routes.stats', 'must be object');
+    else for (const k of ['added', 'removed', 'changed', 'net']) {
+      if (k in r.stats && !Number.isInteger(r.stats[k])) push(`routes.stats.${k}`, 'must be integer');
+    }
+  }
+  if (!Array.isArray(r.groups)) { push('routes.groups', 'required array'); return; }
+  if (r.groups.length < 1) push('routes.groups', 'must have at least one group');
+  r.groups.forEach((g, i) => {
+    const gp = `routes.groups[${i}]`;
+    if (!isObj(g)) { push(gp, 'must be object'); return; }
+    if (!isStr(g.title)) push(`${gp}.title`, 'required string');
+    if (!Array.isArray(g.routes)) { push(`${gp}.routes`, 'required array'); return; }
+    if (g.routes.length < 1) push(`${gp}.routes`, 'must have at least one route');
+    g.routes.forEach((route, j) => validateRouteItem(route, push, `${gp}.routes[${j}]`));
+  });
+}
+
+function validateRouteItem(route, push, path) {
+  if (!isObj(route)) { push(path, 'must be object'); return; }
+  if (!ROUTE_METHODS.has(route.method)) push(`${path}.method`, `must be one of ${[...ROUTE_METHODS].join('|')}`);
+  if (!isStr(route.path)) push(`${path}.path`, 'required string');
+  if (!ROUTE_STATUSES.has(route.status)) push(`${path}.status`, `must be one of ${[...ROUTE_STATUSES].join('|')}`);
+  if (!isStr(route.summary)) push(`${path}.summary`, 'required string');
+  for (const k of ['details', 'auth', 'data', 'replacement', 'review_focus']) {
+    if (k in route && !isStr(route[k])) push(`${path}.${k}`, 'must be string');
+  }
+  for (const k of ['files', 'tests']) {
+    if (k in route) {
+      if (!Array.isArray(route[k])) push(`${path}.${k}`, 'must be array');
+      else route[k].forEach((v, i) => { if (!isStr(v)) push(`${path}.${k}[${i}]`, 'must be string'); });
+    }
+  }
+  if ('parameters' in route) {
+    if (!Array.isArray(route.parameters)) push(`${path}.parameters`, 'must be array');
+    else route.parameters.forEach((p, i) => validateRouteParam(p, push, `${path}.parameters[${i}]`));
+  }
+  if ('request_body' in route) validateRouteBody(route.request_body, push, `${path}.request_body`);
+  if ('responses' in route) {
+    if (!Array.isArray(route.responses)) push(`${path}.responses`, 'must be array');
+    else route.responses.forEach((resp, i) => validateRouteResponse(resp, push, `${path}.responses[${i}]`));
+  }
+}
+
+function validateRouteParam(p, push, path) {
+  if (!isObj(p)) { push(path, 'must be object'); return; }
+  if (!isStr(p.name)) push(`${path}.name`, 'required string');
+  if (!ROUTE_PARAM_IN.has(p.in)) push(`${path}.in`, `must be one of ${[...ROUTE_PARAM_IN].join('|')}`);
+  if ('required' in p && !isBool(p.required)) push(`${path}.required`, 'must be boolean');
+  if ('type' in p && !isStr(p.type)) push(`${path}.type`, 'must be string');
+  if (!isStr(p.description)) push(`${path}.description`, 'required string');
+}
+
+function validateRouteBody(b, push, path) {
+  if (!isObj(b)) { push(path, 'must be object'); return; }
+  if ('required' in b && !isBool(b.required)) push(`${path}.required`, 'must be boolean');
+  if ('type' in b && !isStr(b.type)) push(`${path}.type`, 'must be string');
+  if (!isStr(b.description)) push(`${path}.description`, 'required string');
+  if ('content_type' in b && !isStr(b.content_type)) push(`${path}.content_type`, 'must be string');
+}
+
+function validateRouteResponse(r, push, path) {
+  if (!isObj(r)) { push(path, 'must be object'); return; }
+  if (!isStr(r.code)) push(`${path}.code`, 'required string');
+  if (!isStr(r.description)) push(`${path}.description`, 'required string');
+  if ('content_type' in r && !isStr(r.content_type)) push(`${path}.content_type`, 'must be string');
 }
 
 function validateRiskRollout(r, push) {
