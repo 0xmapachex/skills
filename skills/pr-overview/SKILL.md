@@ -50,14 +50,31 @@ full history.
    the diff. Resolve mismatches by fixing the spec, not by ignoring the
    check.
 
-6. **Render:**
+6. **(UI-heavy PRs) Capture screenshots.** When the spec carries image
+   entries with `route` set, run the capture script after the dev server
+   is up:
 
    ```bash
-   node skills/pr-overview/scripts/render.mjs tmp/pr-overview-spec.json \
+   node skills/pr-overview/scripts/capture.mjs tmp/pr-overview-spec.json \
+        --base-url http://localhost:3000
+   ```
+
+   Produces `tmp/pr-overview-spec.captured.json` with image `src` paths
+   filled in. See "Screenshots" below for the full workflow + auth
+   options. Skip this step for backend-only PRs.
+
+7. **Render:**
+
+   ```bash
+   node skills/pr-overview/scripts/render.mjs \
+        tmp/pr-overview-spec.captured.json \
         --out tmp/pr-overview.html
    ```
 
-7. **Report.** Print the path to the user, and a short text recap
+   (Use the original `tmp/pr-overview-spec.json` directly when no
+   captures ran.)
+
+8. **Report.** Print the path to the user, and a short text recap
    mirroring the spec's `summary.tldr` + `summary.ships`. Offer to open
    in browser if the environment supports it.
 
@@ -73,6 +90,94 @@ full history.
 | `database`         | Diff touches `*.sql`, `**/migrations/**`, `drizzle/schema.ts`, `prisma/schema.prisma`, ORM model files, seed scripts, or columns referenced in new query projections.                       |
 | `flow` / `flows`   | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" Use `flows: []` (one entry per major flow) whenever the PR ships more than one independent flow — never combine them into a single tangled diagram. Reserve singular `flow: {}` for the single-flow case. |
 | `risk_rollout`     | `database` is present OR diff touches `infra/`, `Dockerfile`, `vercel.ts`/`vercel.json`, GitHub workflows, IAM, or env-var defaults.                                                        |
+| `screenshots`      | PR ships UI changes the reviewer benefits from seeing rendered — new pages, dashboards, redesigns, marketing surfaces. Skip for pure refactors, backend-only diffs, or one-line copy edits. |
+
+## Screenshots
+
+UI-heavy PRs benefit from showing the rendered result alongside the
+diagram-first overview. The skill supports two image surfaces:
+
+- **Top-level `screenshots` section** — gallery rendered right after the
+  executive briefing. Reads as "here's what shipped" at a glance.
+- **Inline images** — optional `images: []` arrays on
+  `summary.topics[]`, each flow, and `architecture.details[*]`. Use these
+  when a screenshot belongs with the prose, not in the gallery.
+
+### Image item shape
+
+Every image, in either surface, follows the same shape:
+
+```jsonc
+{
+  "src":      "screenshots/analytics-overview.png", // local path or http(s) URL
+  "alt":      "Analytics overview with period pill and four KPI cards",  // REQUIRED
+  "caption":  "Period-aware KPIs with comparison deltas.",  // optional, ≤ 120 chars
+  "route":    "/analytics?periodo=14d",  // optional — capture script reads this
+  "viewport": { "width": 1440, "height": 900 },  // capture-only override
+  "wait_for": "[data-loaded]",  // capture-only CSS selector or "networkidle"
+  "full_page": false  // capture-only — false captures the viewport only
+}
+```
+
+The minimum is `{ alt }` plus either `src` (you supply the image) OR
+`route` (capture script fills `src` in). `alt` is non-negotiable: it
+drives both screen-reader access and the placeholder shown when the
+capture hasn't run yet.
+
+### Capture workflow
+
+For routes that need screenshots from a live dev server:
+
+1. **Start the dev server yourself.** Service lifecycle is the agent's job
+   per project (`scripts/dev.sh`, `npm run dev`, `docker compose up`,
+   etc.). The capture script just expects URLs to respond.
+2. **(First time) install Playwright:**
+
+   ```bash
+   npm i -D playwright && npx playwright install chromium
+   ```
+
+3. **Run the capture script:**
+
+   ```bash
+   node skills/pr-overview/scripts/capture.mjs tmp/pr-overview-spec.json \
+        --base-url http://localhost:3000
+   ```
+
+   PNGs land in `screenshots/` next to the spec; the script writes
+   `tmp/pr-overview-spec.captured.json` with `src` filled in for every
+   captured image. Pass `--in-place` to rewrite the input spec instead.
+
+4. **Render the captured spec:**
+
+   ```bash
+   node skills/pr-overview/scripts/render.mjs \
+        tmp/pr-overview-spec.captured.json \
+        --out tmp/pr-overview.html
+   ```
+
+5. **Auth.** Most dashboards need login. Either:
+   - Seed an auto-logged-in dev user in your local environment.
+   - Or run `npx playwright codegen <url>`, log in, save storage state,
+     then pass `--storage-state path/to/state.json` to capture.
+
+The rendered HTML inlines every local image as base64 so the file stays
+self-contained. http(s) `src` values pass through and resolve when the
+page is viewed online.
+
+### When to use which surface
+
+- **Top-level gallery (`screenshots`)** — "What ships" view. 3–8
+  hero shots of the new surfaces. Captions one line each.
+- **`summary.topics[].images`** — when a topic explains a specific UI
+  invariant (e.g. "OAuth consent screen", "Empty-state copy"); embed the
+  image alongside the prose so the reviewer sees what it describes.
+- **`flows[].images`** — when a flow has a key visual moment (the page
+  the user lands on, the modal that appears). One or two per flow at
+  most; the sequence diagram is still the load-bearing artifact.
+- **`architecture.details[*].images`** — surfaces specific to a single
+  arch node; shown when the reviewer clicks the node and opens the
+  detail panel.
 
 ## Pre-render verification
 

@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "title": "feat(dashboard): analytics overview + drill-downs",
+    "base": "main",
+    "head": "feat/analytics-dashboard",
+    "files_changed": 64,
+    "additions": 4120,
+    "deletions": 180,
+    "pr_type_tags": ["feature", "frontend", "dashboard"]
+  },
+  "summary": {
+    "tldr": "Owners get a rebuilt analytics dashboard with period-aware KPIs and five drill-downs that answer revenue, occupancy, retention, ticket, and team questions without SQL access.",
+    "ships": [
+      "`/analytics` overview page with metric cards + comparison deltas.",
+      "Five drill-down pages: `/analytics/{revenue,occupancy,retention,ticket,team}`.",
+      "Period pill toolbar that opens a calendar directly + preset dropdown.",
+      "`GET /v1/owner/analytics/{overview,revenue,occupancy,retention,ticket,team}`."
+    ],
+    "why": "The prior /analytics page was a placeholder; KPI questions required SQL.",
+    "topics": [
+      {
+        "title": "Period model",
+        "summary": "Every endpoint accepts the same period contract and computes a matching comparison window for delta chips.",
+        "highlights": [
+          "Shared SQL CTE used by every drill route.",
+          "Comparison window matches current window length — 14d compares 14d."
+        ],
+        "images": [
+          {
+            "src": "screenshots/period-pill-open.png",
+            "alt": "Period pill expanded showing preset dropdown and date-range calendar side by side",
+            "caption": "PeriodPill opens the calendar directly; presets live next to it."
+          }
+        ]
+      }
+    ]
+  },
+  "screenshots": {
+    "summary": "Six new dashboard surfaces with period-aware KPIs and drill-downs.",
+    "highlights": [
+      "Overview lands on metric cards + breakdown bars + delta chips.",
+      "Each drill-down inherits the same toolbar + comparison contract.",
+      "Bar lists are click-through to the matching `/reportes/*` slice."
+    ],
+    "items": [
+      {
+        "route": "/analytics",
+        "alt": "Analytics overview with period pill, four KPI cards, and revenue breakdown bars",
+        "caption": "/analytics — KPI strip + revenue, occupancy, retention, ticket cards.",
+        "viewport": { "width": 1440, "height": 900 }
+      },
+      {
+        "route": "/analytics/revenue",
+        "alt": "Revenue drill-down with stacked area chart over 14 days plus method breakdown",
+        "caption": "/analytics/revenue — stacked-area trend + payment-method breakdown."
+      },
+      {
+        "route": "/analytics/occupancy",
+        "alt": "Occupancy drill-down with day-of-week heatmap and per-staff stacked bar",
+        "caption": "/analytics/occupancy — DOW × hour heatmap + per-staff stacked bar."
+      },
+      {
+        "route": "/analytics/retention",
+        "alt": "Retention cohort grid colored by return-rate decile",
+        "caption": "/analytics/retention — cohort grid (rows: cohort, cols: weeks since)."
+      },
+      {
+        "route": "/analytics/ticket",
+        "alt": "Average ticket drill-down with service-mix breakdown rows",
+        "caption": "/analytics/ticket — service-mix counts + avg ticket per service."
+      },
+      {
+        "route": "/analytics/team",
+        "alt": "Team performance with donut pie of stylist revenue share and per-staff metric cards",
+        "caption": "/analytics/team — revenue donut + per-staff cards."
+      }
+    ]
+  },
+  "architecture": {
+    "summary": "Six new pages fan out to one analytics API route file backed by sessions + payments queries.",
+    "highlights": [
+      "Pages are Server Components; period CTE shared across all six endpoints.",
+      "Toolbar pills round-trip into the URL search params for shareable views."
+    ],
+    "nodes": [
+      { "id": "pages", "label": "/analytics pages", "kind": "ui",        "changed": true },
+      { "id": "kit",   "label": "analytics kit",    "kind": "module",    "changed": true },
+      { "id": "api",   "label": "/v1/owner/analytics", "kind": "service", "changed": true },
+      { "id": "db",    "label": "Postgres (sessions + payments)", "kind": "datastore", "changed": false }
+    ],
+    "edges": [
+      { "from": "pages", "to": "kit",  "label": "composes", "kind": "data" },
+      { "from": "pages", "to": "api",  "label": "RSC fetch", "kind": "sync" },
+      { "from": "api",   "to": "db",   "label": "withTenant", "kind": "data" }
+    ]
+  },
+  "open_questions": {
+    "items": [
+      "Is the period CTE truly shared, or duplicated across the six endpoints?",
+      "Should bar-list click-throughs deep-link to /reportes filters or just the base report?"
+    ]
+  }
+}

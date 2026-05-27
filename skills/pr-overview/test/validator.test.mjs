@@ -80,3 +80,57 @@ test('rejects architecture as null', () => {
   assert.equal(valid, false);
   assert.ok(errors.some((e) => /^architecture: must be object/.test(e)), errors.join('\n'));
 });
+
+test('accepts screenshots section with src + alt', () => {
+  const ok = JSON.parse(JSON.stringify(FIXTURE));
+  ok.screenshots = {
+    items: [{ src: 'shot.png', alt: 'a homepage' }],
+  };
+  assert.deepEqual(validate(ok).errors, []);
+});
+
+test('accepts screenshots section with route only (capture-pending)', () => {
+  const ok = JSON.parse(JSON.stringify(FIXTURE));
+  ok.screenshots = {
+    items: [{ route: '/welcome', alt: 'welcome page' }],
+  };
+  assert.deepEqual(validate(ok).errors, []);
+});
+
+test('rejects screenshots item missing alt', () => {
+  const bad = JSON.parse(JSON.stringify(FIXTURE));
+  bad.screenshots = { items: [{ src: 'shot.png' }] };
+  const { errors } = validate(bad);
+  assert.ok(errors.some((e) => /screenshots\.items\[0\]\.alt/.test(e)), errors.join('\n'));
+});
+
+test('rejects screenshots item with neither src nor route', () => {
+  const bad = JSON.parse(JSON.stringify(FIXTURE));
+  bad.screenshots = { items: [{ alt: 'no source' }] };
+  const { errors } = validate(bad);
+  assert.ok(
+    errors.some((e) => /must have either `src` .* or `route`/.test(e)),
+    errors.join('\n')
+  );
+});
+
+test('accepts inline images on summary.topics', () => {
+  const ok = JSON.parse(JSON.stringify(FIXTURE));
+  ok.summary.topics = [
+    {
+      title: 'A',
+      summary: 'a',
+      images: [{ src: 'a.png', alt: 'a' }],
+    },
+  ];
+  assert.deepEqual(validate(ok).errors, []);
+});
+
+test('rejects more than 12 images in a single list', () => {
+  const bad = JSON.parse(JSON.stringify(FIXTURE));
+  bad.screenshots = {
+    items: Array.from({ length: 13 }, (_, i) => ({ src: `s${i}.png`, alt: `s${i}` })),
+  };
+  const { errors } = validate(bad);
+  assert.ok(errors.some((e) => /screenshots\.items: max 12/.test(e)), errors.join('\n'));
+});
