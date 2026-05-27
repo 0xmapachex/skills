@@ -28,6 +28,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve, join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const DEFAULT_BASE_URL = 'http://localhost:3000';
@@ -141,16 +142,47 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
 
   // Lazy-import Playwright so users who don't capture don't need it installed.
+  // Skill scripts often live outside the consumer project (e.g. installed
+  // under ~/.claude/skills/pr-overview), so a bare `import 'playwright'`
+  // resolves against the SCRIPT's node_modules, not the project's. Fall
+  // back to resolving against the spec dir and the current cwd so a
+  // project-local install is reachable.
   let chromium;
-  try {
-    ({ chromium } = await import('playwright'));
-  } catch (_) {
-    console.error(`playwright is not installed.
+  const tryDirs = [specDir, process.cwd()];
+  const resolveAttempts = [
+    () => import('playwright'),
+    ...tryDirs.map((dir) => () => {
+      // createRequire(anchor) gives us a CJS-style require fn whose
+      // module-resolution root is `anchor`'s directory. We resolve the
+      // package.json (CJS resolver returns the CJS index.js for the
+      // bare specifier, which on ESM-import yields no named `chromium`
+      // export — Playwright dual-publishes), then walk up to the package
+      // root and import its ESM entry explicitly.
+      const req = createRequire(join(dir, 'package.json'));
+      const pkgJsonPath = req.resolve('playwright/package.json');
+      const pkgRoot = dirname(pkgJsonPath);
+      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+      const esmEntry = pkg.exports?.['.']?.import || pkg.module || pkg.main;
+      const entry = pathToFileURL(join(pkgRoot, esmEntry)).href;
+      return import(entry);
+    }),
+  ];
+  let lastErr;
+  for (const attempt of resolveAttempts) {
+    try { ({ chromium } = await attempt()); if (chromium) break; }
+    catch (err) { lastErr = err; }
+  }
+  if (!chromium) {
+    console.error(`playwright is not installed (last error: ${lastErr?.message || lastErr}).
 
-Install with one of:
-  npm i -D playwright && npx playwright install chromium
-  pnpm add -D playwright && pnpm exec playwright install chromium
-  yarn add -D playwright && yarn playwright install chromium
+Install one of:
+  cd <your project> && npm i --no-save playwright && npx playwright install chromium
+  cd <your project> && pnpm add -D playwright && pnpm exec playwright install chromium
+  cd <your project> && yarn add -D playwright && yarn playwright install chromium
+
+The script looks for playwright next to the skill itself, next to the
+spec file, and from the current working directory — install it in any
+of those node_modules trees.
 
 Or skip capture and provide screenshot paths directly via the spec's
 image.src field (any PNG/JPG/SVG path relative to the spec file works).`);
