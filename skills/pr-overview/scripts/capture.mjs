@@ -2,52 +2,66 @@
 // Capture screenshots for a pr-overview spec.
 //
 // Reads a spec JSON, finds every image entry with a `route` (or a `src`
-// that's already an http(s) URL with no local file), launches a headless
-// chromium via Playwright, navigates, waits, screenshots, and writes the
-// resulting PNG paths back into the spec.
+// that's already an http(s) URL with no local file), drives gstack's
+// /browse binary (persistent headless Chromium daemon, ~100ms per command
+// after a one-time ~3s start), navigates, waits, screenshots, and writes
+// the resulting PNG paths back into the spec.
 //
 // Service lifecycle is intentionally NOT this script's job. Start your dev
 // server first (`scripts/dev.sh`, `npm run dev`, `docker compose up`, etc.);
-// this script just expects the URLs to respond. If you need authentication,
-// pass --storage-state path/to/state.json — Playwright loads cookies +
-// localStorage from it before navigating.
+// this script just expects the URLs to respond.
+//
+// Auth: the browse daemon persists cookies across runs. If a route
+// redirects to /login, the script emits a `capture_error` on that image
+// and exits non-zero with one-time instructions on how to authenticate
+// inside the same daemon (one `handoff` to a visible Chrome, log in
+// manually, then re-run capture — subsequent captures reuse the cookies).
 //
 // Usage:
 //   node scripts/capture.mjs <spec.json> [--base-url URL] [--out-dir DIR]
-//                            [--storage-state PATH] [--in-place]
+//                            [--in-place] [--no-install]
 //
 // Output:
-//   - PNGs in <out-dir> (default tmp/screenshots/, next to the spec)
+//   - PNGs in <out-dir> (default screenshots/ next to the spec)
 //   - <spec>.captured.json next to the input (or in-place with --in-place)
 //
-// Cookies / auth tip: log in once in a real browser session that Playwright
-// drives via `npx playwright codegen`, save its storage state, then pass
-// --storage-state to subsequent captures. Or seed a dev user that's
-// auto-logged-in in your local environment.
+// Why /browse (not Playwright):
+//   - One binary, no per-project node_modules write, no 250MB chromium
+//     install per consumer.
+//   - Cookie persistence by default — no `storage-state` ceremony.
+//   - Auth handoff is one command (`browse handoff` → user logs in →
+//     `browse resume`) — no `playwright codegen` recording.
+//   - Already a dependency for most gstack workflows; pr-overview just
+//     leans on the same install.
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
-import { dirname, resolve, join, relative } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { createRequire } from 'node:module';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, relative, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const DEFAULT_VIEWPORT = { width: 1440, height: 900 };
 const DEFAULT_BASE_URL = 'http://localhost:3000';
 const DEFAULT_TIMEOUT_MS = 20000;
+
+const GSTACK_REPO = 'https://github.com/garrytan/gstack.git';
+const GSTACK_HOME_DIR = join(homedir(), '.claude/skills/gstack');
+const BUN_INSTALL_SHA = 'bab8acfb046aac8c72407bdcce903957665d655d7acaa3e11c7c4616beae68dd';
+const BUN_VERSION = '1.3.10';
 
 function parseArgs(argv) {
   const args = {
     spec: null,
     baseUrl: DEFAULT_BASE_URL,
     outDir: null,
-    storageState: null,
     inPlace: false,
+    noInstall: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--base-url')          args.baseUrl = argv[++i];
     else if (a === '--out-dir')      args.outDir = argv[++i];
-    else if (a === '--storage-state')args.storageState = argv[++i];
     else if (a === '--in-place')     args.inPlace = true;
+    else if (a === '--no-install')   args.noInstall = true;
     else if (a === '--help' || a === '-h') args.help = true;
     else if (!args.spec) args.spec = a;
   }
@@ -59,18 +73,126 @@ function usage() {
     'usage: node scripts/capture.mjs <spec.json> [options]',
     '',
     'options:',
-    `  --base-url URL          base URL for entries with a "route" (default ${DEFAULT_BASE_URL})`,
-    '  --out-dir DIR           directory to write PNGs (default screenshots/ next to spec)',
-    '  --storage-state PATH    Playwright storage state file (auth cookies + localStorage)',
-    '  --in-place              rewrite the input spec; otherwise writes <spec>.captured.json',
-    '  --help                  show this help',
+    `  --base-url URL    base URL for entries with a "route" (default ${DEFAULT_BASE_URL})`,
+    '  --out-dir DIR     directory to write PNGs (default screenshots/ next to spec)',
+    '  --in-place        rewrite the input spec; otherwise writes <spec>.captured.json',
+    '  --no-install      fail instead of auto-installing gstack if /browse missing',
+    '  --help            show this help',
+    '',
+    'auth: if a route redirects to /login, the captured spec records the',
+    'error per-image and exits 1. Authenticate inside the browse daemon once:',
+    '  <browse-binary> handoff "log into <your-dev-url>"',
+    '  # log in in the Chrome window that opened',
+    '  <browse-binary> resume',
+    '  # then rerun capture — cookies persist across calls',
   ].join('\n'));
 }
 
-// Walk the spec, collect every image entry that needs capture. Returns a
-// flat array of { ref, item } where `ref` is a function that mutates the
-// original spec when capture finishes. Keeping mutation behind a callback
-// avoids hard-coding traversal paths everywhere.
+// ─── gstack /browse resolution + (optional) auto-install ────────────────────
+
+function findBrowseBinary() {
+  // 1. Worktree-local (vendored) gstack — when a project ships its own copy.
+  const gitTop = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  if (gitTop.status === 0) {
+    const top = gitTop.stdout.toString().trim();
+    const local = join(top, '.claude/skills/gstack/browse/dist/browse');
+    if (existsSync(local)) return local;
+  }
+  // 2. Global install.
+  const global = join(GSTACK_HOME_DIR, 'browse/dist/browse');
+  if (existsSync(global)) return global;
+  return null;
+}
+
+function hasCommand(cmd) {
+  return spawnSync('command', ['-v', cmd], { shell: true, stdio: 'ignore' }).status === 0;
+}
+
+function installBun() {
+  if (hasCommand('bun')) return true;
+  console.error('[capture] bun not found — installing one-time (checksum-verified)...');
+  // Match the install pattern documented in gstack's own setup script.
+  const script = `
+    set -e
+    tmpfile=$(mktemp)
+    curl -fsSL https://bun.sh/install -o "$tmpfile"
+    actual=$(shasum -a 256 "$tmpfile" | awk '{print $1}')
+    if [ "$actual" != "${BUN_INSTALL_SHA}" ]; then
+      echo "ERROR: bun install script checksum mismatch" >&2
+      echo "  expected: ${BUN_INSTALL_SHA}" >&2
+      echo "  got:      $actual" >&2
+      rm "$tmpfile"
+      exit 1
+    fi
+    BUN_VERSION="${BUN_VERSION}" bash "$tmpfile"
+    rm "$tmpfile"
+  `;
+  const r = spawnSync('bash', ['-c', script], { stdio: 'inherit' });
+  if (r.status !== 0) return false;
+  // Bun installs to ~/.bun/bin — surface it for this process.
+  process.env.PATH = `${homedir()}/.bun/bin:${process.env.PATH ?? ''}`;
+  return hasCommand('bun');
+}
+
+function installGstack() {
+  if (!existsSync(GSTACK_HOME_DIR)) {
+    console.error(`[capture] cloning gstack into ${GSTACK_HOME_DIR}...`);
+    mkdirSync(dirname(GSTACK_HOME_DIR), { recursive: true });
+    const r = spawnSync('git', ['clone', '--depth=1', GSTACK_REPO, GSTACK_HOME_DIR], {
+      stdio: 'inherit',
+    });
+    if (r.status !== 0) throw new Error('gstack clone failed');
+  }
+  if (!installBun()) throw new Error('bun install failed');
+  console.error('[capture] running gstack setup (builds browse binary, ~30s)...');
+  const r = spawnSync('bash', ['./setup'], {
+    cwd: GSTACK_HOME_DIR,
+    stdio: 'inherit',
+  });
+  if (r.status !== 0) throw new Error('gstack setup failed');
+  const bin = findBrowseBinary();
+  if (!bin) throw new Error('browse binary still missing after gstack setup');
+  return bin;
+}
+
+function ensureBrowse({ noInstall }) {
+  let bin = findBrowseBinary();
+  if (bin) return bin;
+  if (noInstall) {
+    console.error([
+      'gstack /browse binary not found and --no-install was passed.',
+      '',
+      'Install gstack manually:',
+      `  git clone ${GSTACK_REPO} ${GSTACK_HOME_DIR}`,
+      `  cd ${GSTACK_HOME_DIR} && ./setup`,
+      '',
+      'Or rerun without --no-install to auto-install (one-time, ~30s).',
+    ].join('\n'));
+    process.exit(2);
+  }
+  console.error('[capture] gstack /browse not installed — bootstrapping (one-time)...');
+  return installGstack();
+}
+
+// Thin wrapper around the browse binary. Each call is a separate process,
+// but the daemon (started on first `goto`) lives across them — that's how
+// cookies + tabs persist between captures.
+function browse(bin, ...args) {
+  const r = spawnSync(bin, args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    encoding: 'utf8',
+  });
+  return {
+    code: r.status ?? -1,
+    stdout: (r.stdout ?? '').trim(),
+    stderr: (r.stderr ?? '').trim(),
+  };
+}
+
+// ─── Spec walking + helpers (unchanged from the prior version) ──────────────
+
 function collectTargets(spec) {
   const targets = [];
   const consider = (img, location) => {
@@ -117,9 +239,27 @@ function urlFor(img, baseUrl) {
     const route = img.route.startsWith('/') ? img.route : `/${img.route}`;
     return base + route;
   }
-  // Fallback: spec author put an http(s) URL directly in src.
   if (typeof img.src === 'string' && /^https?:/i.test(img.src)) return img.src;
   return null;
+}
+
+function relativeFromSpec(specPath, file) {
+  return relative(dirname(specPath), file).split(/\\/g).join('/');
+}
+
+// Login-redirect heuristic: route doesn't mention /login but the final URL
+// does. Catches the silent-success-on-login-page failure mode that lets
+// every captured screenshot become the same login screen.
+function looksLikeLoginRedirect(routePath, finalUrl) {
+  try {
+    const u = new URL(finalUrl);
+    const finalPath = u.pathname.toLowerCase();
+    const reqPath = (routePath || '').split('?')[0].toLowerCase();
+    const loginRe = /\/(login|signin|sign-in|signup|sign-up|auth)\b/;
+    return loginRe.test(finalPath) && !loginRe.test(reqPath);
+  } catch {
+    return false;
+  }
 }
 
 async function main() {
@@ -141,62 +281,17 @@ async function main() {
     : join(specDir, 'screenshots');
   mkdirSync(outDir, { recursive: true });
 
-  // Lazy-import Playwright so users who don't capture don't need it installed.
-  // Skill scripts often live outside the consumer project (e.g. installed
-  // under ~/.claude/skills/pr-overview), so a bare `import 'playwright'`
-  // resolves against the SCRIPT's node_modules, not the project's. Fall
-  // back to resolving against the spec dir and the current cwd so a
-  // project-local install is reachable.
-  let chromium;
-  const tryDirs = [specDir, process.cwd()];
-  const resolveAttempts = [
-    () => import('playwright'),
-    ...tryDirs.map((dir) => () => {
-      // createRequire(anchor) gives us a CJS-style require fn whose
-      // module-resolution root is `anchor`'s directory. We resolve the
-      // package.json (CJS resolver returns the CJS index.js for the
-      // bare specifier, which on ESM-import yields no named `chromium`
-      // export — Playwright dual-publishes), then walk up to the package
-      // root and import its ESM entry explicitly.
-      const req = createRequire(join(dir, 'package.json'));
-      const pkgJsonPath = req.resolve('playwright/package.json');
-      const pkgRoot = dirname(pkgJsonPath);
-      const pkg = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
-      const esmEntry = pkg.exports?.['.']?.import || pkg.module || pkg.main;
-      const entry = pathToFileURL(join(pkgRoot, esmEntry)).href;
-      return import(entry);
-    }),
-  ];
-  let lastErr;
-  for (const attempt of resolveAttempts) {
-    try { ({ chromium } = await attempt()); if (chromium) break; }
-    catch (err) { lastErr = err; }
-  }
-  if (!chromium) {
-    console.error(`playwright is not installed (last error: ${lastErr?.message || lastErr}).
-
-Install one of:
-  cd <your project> && npm i --no-save playwright && npx playwright install chromium
-  cd <your project> && pnpm add -D playwright && pnpm exec playwright install chromium
-  cd <your project> && yarn add -D playwright && yarn playwright install chromium
-
-The script looks for playwright next to the skill itself, next to the
-spec file, and from the current working directory — install it in any
-of those node_modules trees.
-
-Or skip capture and provide screenshot paths directly via the spec's
-image.src field (any PNG/JPG/SVG path relative to the spec file works).`);
-    process.exit(1);
-  }
-
-  const browser = await chromium.launch();
-  const contextOpts = {};
-  if (args.storageState) contextOpts.storageState = resolve(args.storageState);
-  const context = await browser.newContext(contextOpts);
-
+  const $B = ensureBrowse({ noInstall: args.noInstall });
   console.log(`capturing ${targets.length} screenshot${targets.length === 1 ? '' : 's'} → ${outDir}`);
+  console.log(`  via ${$B}`);
 
-  let ok = 0; let fail = 0;
+  // Track current viewport so we only call `viewport WxH` when it changes.
+  let currentVp = null;
+
+  let ok = 0;
+  let fail = 0;
+  let authNeeded = 0;
+
   for (let i = 0; i < targets.length; i++) {
     const { img, location } = targets[i];
     const url = urlFor(img, args.baseUrl);
@@ -208,48 +303,108 @@ image.src field (any PNG/JPG/SVG path relative to the spec file works).`);
     const slug = slugFor(img, i);
     const file = join(outDir, `${slug}.png`);
     const vp = { ...DEFAULT_VIEWPORT, ...(img.viewport || {}) };
-    const page = await context.newPage();
-    await page.setViewportSize(vp);
-    try {
-      await page.goto(url, { waitUntil: 'networkidle', timeout: DEFAULT_TIMEOUT_MS });
-      if (img.wait_for && img.wait_for !== 'networkidle') {
-        await page.waitForSelector(img.wait_for, { timeout: DEFAULT_TIMEOUT_MS });
+    const vpKey = `${vp.width}x${vp.height}`;
+    if (vpKey !== currentVp) {
+      const r = browse($B, 'viewport', vpKey);
+      if (r.code !== 0) {
+        console.error(`  ✗ ${slug}: viewport set failed: ${r.stderr || r.stdout}`);
+        fail += 1;
+        continue;
       }
-      await page.screenshot({ path: file, fullPage: !!img.full_page });
-      // Rewrite src to a path relative to the spec file so the rendered
-      // HTML can resolve + inline it.
-      img.src = relativeFromSpec(specPath, file);
-      console.log(`  ✓ ${slug}.png  ${location}`);
-      ok += 1;
-    } catch (err) {
-      console.error(`  ✗ ${slug}: ${err.message}`);
-      fail += 1;
-    } finally {
-      await page.close();
+      currentVp = vpKey;
     }
-  }
 
-  await context.close();
-  await browser.close();
+    const goto = browse($B, 'goto', url);
+    if (goto.code !== 0) {
+      console.error(`  ✗ ${slug}: goto failed: ${goto.stderr || goto.stdout}`);
+      img.capture_error = `goto_failed: ${goto.stderr || goto.stdout}`.slice(0, 240);
+      fail += 1;
+      continue;
+    }
+
+    // Settle the page. networkidle has a 15s timeout in browse and many
+    // SPAs never fully reach it (long-polling, websocket, analytics
+    // beacons), so a timeout here is treated as a soft warning — the
+    // resulting screenshot is usually still the rendered post-DCL state,
+    // not the loading skeleton. Hard-failing every networkidle miss
+    // would block valid captures.
+    const ni = browse($B, 'wait', '--networkidle');
+    if (ni.code !== 0) {
+      console.warn(`  ⚠ ${slug}: wait --networkidle did not settle (continuing): ${(ni.stderr || ni.stdout).slice(0, 120)}`);
+    }
+
+    const requestedPath = new URL(url).pathname + (new URL(url).search || '');
+    const finalUrl = browse($B, 'url').stdout || url;
+    if (looksLikeLoginRedirect(requestedPath, finalUrl)) {
+      console.error(`  ✗ ${slug}: redirected to ${finalUrl} (auth required)`);
+      img.capture_error = `auth_redirected_to:${finalUrl}`;
+      authNeeded += 1;
+      continue;
+    }
+
+    // wait_for selector miss IS a hard fail — the spec author named a
+    // selector they expect to be present, so its absence means the page
+    // didn't render what we're trying to screenshot.
+    if (img.wait_for && img.wait_for !== 'networkidle') {
+      const ws = browse($B, 'wait', img.wait_for);
+      if (ws.code !== 0) {
+        console.error(`  ✗ ${slug}: wait_for selector "${img.wait_for}" failed: ${ws.stderr || ws.stdout}`);
+        img.capture_error = `wait_for_failed: ${img.wait_for}: ${ws.stderr || ws.stdout}`.slice(0, 240);
+        fail += 1;
+        continue;
+      }
+    }
+
+    // /browse `screenshot path` is full-page by default. The spec's
+    // `full_page: false` (or omitted) requests viewport-only, so flip on
+    // --viewport unless the spec explicitly opts into full-page. Schema
+    // and SKILL.md document `full_page` as the toggle for this.
+    const shotArgs = ['screenshot', file];
+    if (!img.full_page) shotArgs.splice(1, 0, '--viewport');
+    const shot = browse($B, ...shotArgs);
+    if (shot.code !== 0) {
+      console.error(`  ✗ ${slug}: screenshot failed: ${shot.stderr || shot.stdout}`);
+      img.capture_error = `screenshot_failed: ${shot.stderr || shot.stdout}`.slice(0, 240);
+      fail += 1;
+      continue;
+    }
+
+    img.src = relativeFromSpec(specPath, file);
+    delete img.capture_error;
+    console.log(`  ✓ ${slug}.png  ${location}`);
+    ok += 1;
+  }
 
   const outSpec = args.inPlace
     ? specPath
     : specPath.replace(/\.json$/i, '.captured.json');
   writeFileSync(outSpec, JSON.stringify(spec, null, 2) + '\n', 'utf8');
   console.log(`wrote ${outSpec}`);
-  console.log(`${ok} captured · ${fail} failed`);
-  if (fail > 0) process.exitCode = 1;
+  console.log(`${ok} captured · ${fail} failed${authNeeded ? ` · ${authNeeded} need auth` : ''}`);
+
+  if (authNeeded > 0) {
+    console.error([
+      '',
+      `${authNeeded} route(s) redirected to a login page.`,
+      'Authenticate once inside the same browse daemon (cookies persist):',
+      '',
+      `  ${$B} handoff "log in to your dev app"`,
+      '  # log in in the Chrome window that opened',
+      `  ${$B} resume`,
+      '',
+      'Then rerun this capture command — the subsequent navigations will',
+      'reuse the session cookies.',
+    ].join('\n'));
+  }
+
+  if (fail > 0 || authNeeded > 0) process.exitCode = 1;
 }
 
-// Path of `file` relative to the directory containing `specPath`, normalised
-// to forward slashes so it's portable when the spec moves machines.
-function relativeFromSpec(specPath, file) {
-  return relative(dirname(specPath), file).split(/\\/g).join('/');
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
-}
+// capture.mjs is only ever invoked directly (never imported). Always run
+// main(). The previous "if (import.meta.url === pathToFileURL(...))" guard
+// silently no-op'd on macOS, where /tmp resolves to /private/tmp and the
+// two paths never agreed.
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
