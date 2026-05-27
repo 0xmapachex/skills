@@ -61,7 +61,9 @@ full history.
 
    Produces `tmp/pr-overview-spec.captured.json` with image `src` paths
    filled in. See "Screenshots" below for the full workflow + auth
-   options. Skip this step for backend-only PRs.
+   options. Skip this step only when the spec has no image entries with
+   a `route` (i.e. the `screenshots` section was correctly omitted per
+   the trigger rule, or every image already has a hand-supplied `src`).
 
 7. **Render:**
 
@@ -90,7 +92,7 @@ full history.
 | `database`         | Diff touches `*.sql`, `**/migrations/**`, `drizzle/schema.ts`, `prisma/schema.prisma`, ORM model files, seed scripts, or columns referenced in new query projections.                       |
 | `flow` / `flows`   | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" Use `flows: []` (one entry per major flow) whenever the PR ships more than one independent flow — never combine them into a single tangled diagram. Reserve singular `flow: {}` for the single-flow case. |
 | `risk_rollout`     | `database` is present OR diff touches `infra/`, `Dockerfile`, `vercel.ts`/`vercel.json`, GitHub workflows, IAM, or env-var defaults.                                                        |
-| `screenshots`      | PR ships UI changes the reviewer benefits from seeing rendered — new pages, dashboards, redesigns, marketing surfaces. Skip for pure refactors, backend-only diffs, or one-line copy edits. |
+| `screenshots`      | **REQUIRED when pre-render check #2 returns ≥1 new `page.tsx` (or framework equivalent).** Also when the diff redesigns existing pages (≥1 `page.tsx` modified with ≥30% line change). Skip only for pure refactors, backend-only diffs, or one-line copy edits — and when skipping despite a check #2 hit, `open_questions` MUST record why (e.g. "dev stack unreachable in CI agent"). See check #8. |
 
 ## Screenshots
 
@@ -284,6 +286,28 @@ additive schema change has a migration story.
    changed"), produce the actual list or command output. If the number
    cannot be reproduced, remove or rewrite the claim.
 
+8. **Screenshots presence (forcing).** This check has no flexibility —
+   it exists because skipping screenshots is the easiest section to
+   silently rationalize past. If check #2 returned ≥1 new `page.tsx`,
+   the spec MUST satisfy one of:
+
+   a. A top-level `screenshots` section with ≥1 item covering the new
+      pages (3–8 hero shots is the recommended cap), OR
+   b. Inline `images: []` on the `summary.topics[]` /
+      `architecture.details[*]` entries that own those pages, with at
+      least one image per shipped surface, OR
+   c. An explicit entry in `open_questions` of the form:
+      `"Screenshots skipped — <concrete reason>"`. Acceptable reasons:
+      "dev stack unreachable", "auth credentials unavailable",
+      "non-interactive environment". Unacceptable reasons: "would take
+      time", "judgment call", "PR is large".
+
+   "I'll skip captures and add them in a follow-up" is not acceptable —
+   either add the section with `route` placeholders (the renderer shows
+   alt-text placeholders until captures run) or record the skip-reason
+   in `open_questions`. The reviewer needs to know whether the gallery
+   is absent by intent or by omission.
+
 Run these checks in one pass and keep a private `STATUS / MISMATCH / FIX`
 log while editing the spec. Do not render until the mismatches are gone.
 
@@ -304,6 +328,11 @@ log while editing the spec. Do not render until the mismatches are gone.
 6. **Risk/question identifiers are anchored.** If `risk_rollout` or
    `open_questions` names an identifier, the main explanatory sections
    must contain enough context for that identifier.
+7. **Screenshots are not silently optional.** Any PR that adds a new
+   `page.tsx` (or framework equivalent) MUST either ship the
+   `screenshots` section or record an explicit skip-reason in
+   `open_questions`. See pre-render check #8 — there is no third
+   option.
 
 ## Edge cases
 
