@@ -126,29 +126,34 @@ capture hasn't run yet.
 
 ### Capture workflow
 
+Capture drives gstack's `/browse` binary (persistent headless Chromium
+daemon, ~3s cold start, ~100ms per command after that). If `/browse`
+isn't installed yet, the capture script bootstraps it once
+(clone + `bash setup`, ~30s) — no `npm i playwright` step, no chromium
+download per consumer, no per-project `node_modules` write.
+
 For routes that need screenshots from a live dev server:
 
 1. **Start the dev server yourself.** Service lifecycle is the agent's job
    per project (`scripts/dev.sh`, `npm run dev`, `docker compose up`,
    etc.). The capture script just expects URLs to respond.
-2. **(First time) install Playwright:**
 
-   ```bash
-   npm i -D playwright && npx playwright install chromium
-   ```
-
-3. **Run the capture script:**
+2. **Run the capture script:**
 
    ```bash
    node skills/pr-overview/scripts/capture.mjs tmp/pr-overview-spec.json \
         --base-url http://localhost:3000
    ```
 
+   On first run with no gstack present, the script auto-installs gstack
+   into `~/.claude/skills/gstack/` and builds the `/browse` binary.
+   Pass `--no-install` to fail-fast instead.
+
    PNGs land in `screenshots/` next to the spec; the script writes
    `tmp/pr-overview-spec.captured.json` with `src` filled in for every
    captured image. Pass `--in-place` to rewrite the input spec instead.
 
-4. **Render the captured spec:**
+3. **Render the captured spec:**
 
    ```bash
    node skills/pr-overview/scripts/render.mjs \
@@ -156,10 +161,20 @@ For routes that need screenshots from a live dev server:
         --out tmp/pr-overview.html
    ```
 
-5. **Auth.** Most dashboards need login. Either:
-   - Seed an auto-logged-in dev user in your local environment.
-   - Or run `npx playwright codegen <url>`, log in, save storage state,
-     then pass `--storage-state path/to/state.json` to capture.
+4. **Auth.** Most dashboards need login. The capture script detects when
+   a route redirects to a login page, records `capture_error` on that
+   image, and exits 1 with one-time auth instructions. Authenticate once
+   inside the same browse daemon — cookies persist across runs:
+
+   ```bash
+   ~/.claude/skills/gstack/browse/dist/browse handoff "log in to your dev app"
+   # log in in the Chrome window that opened
+   ~/.claude/skills/gstack/browse/dist/browse resume
+   ```
+
+   Then rerun the capture command — subsequent navigations reuse the
+   session cookies. No `storage-state` files to manage, no `codegen`
+   recording, no fingerprint-fragile state to ship between machines.
 
 The rendered HTML inlines every local image as base64 so the file stays
 self-contained. http(s) `src` values pass through and resolve when the
