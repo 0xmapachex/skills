@@ -322,9 +322,16 @@ async function main() {
       continue;
     }
 
-    // Settle the page — networkidle has a 15s timeout in browse, which is
-    // fine for any reasonable dev server.
-    browse($B, 'wait', '--networkidle');
+    // Settle the page. networkidle has a 15s timeout in browse and many
+    // SPAs never fully reach it (long-polling, websocket, analytics
+    // beacons), so a timeout here is treated as a soft warning — the
+    // resulting screenshot is usually still the rendered post-DCL state,
+    // not the loading skeleton. Hard-failing every networkidle miss
+    // would block valid captures.
+    const ni = browse($B, 'wait', '--networkidle');
+    if (ni.code !== 0) {
+      console.warn(`  ⚠ ${slug}: wait --networkidle did not settle (continuing): ${(ni.stderr || ni.stdout).slice(0, 120)}`);
+    }
 
     const requestedPath = new URL(url).pathname + (new URL(url).search || '');
     const finalUrl = browse($B, 'url').stdout || url;
@@ -335,11 +342,26 @@ async function main() {
       continue;
     }
 
+    // wait_for selector miss IS a hard fail — the spec author named a
+    // selector they expect to be present, so its absence means the page
+    // didn't render what we're trying to screenshot.
     if (img.wait_for && img.wait_for !== 'networkidle') {
-      browse($B, 'wait', img.wait_for);
+      const ws = browse($B, 'wait', img.wait_for);
+      if (ws.code !== 0) {
+        console.error(`  ✗ ${slug}: wait_for selector "${img.wait_for}" failed: ${ws.stderr || ws.stdout}`);
+        img.capture_error = `wait_for_failed: ${img.wait_for}: ${ws.stderr || ws.stdout}`.slice(0, 240);
+        fail += 1;
+        continue;
+      }
     }
 
-    const shot = browse($B, 'screenshot', file);
+    // /browse `screenshot path` is full-page by default. The spec's
+    // `full_page: false` (or omitted) requests viewport-only, so flip on
+    // --viewport unless the spec explicitly opts into full-page. Schema
+    // and SKILL.md document `full_page` as the toggle for this.
+    const shotArgs = ['screenshot', file];
+    if (!img.full_page) shotArgs.splice(1, 0, '--viewport');
+    const shot = browse($B, ...shotArgs);
     if (shot.code !== 0) {
       console.error(`  ✗ ${slug}: screenshot failed: ${shot.stderr || shot.stdout}`);
       img.capture_error = `screenshot_failed: ${shot.stderr || shot.stdout}`.slice(0, 240);
