@@ -32,7 +32,7 @@ export function validate(spec) {
   // allowed top-level keys only
   const ALLOWED = new Set([
     'meta', 'summary', 'architecture', 'flow', 'flows', 'database',
-    'routes', 'risk_rollout', 'open_questions', 'screenshots',
+    'routes', 'risk_rollout', 'open_questions',
   ]);
   for (const k of Object.keys(spec)) {
     if (!ALLOWED.has(k)) push('$', `unknown key: ${k}`);
@@ -46,51 +46,10 @@ export function validate(spec) {
   if ('flows' in spec)             validateFlows(spec.flows, push);
   if ('database' in spec)          validateDatabase(spec.database, push);
   if ('routes' in spec)            validateRoutes(spec.routes, push);
-  if ('screenshots' in spec)       validateScreenshots(spec.screenshots, push);
   if ('risk_rollout' in spec)      validateRiskRollout(spec.risk_rollout, push);
   if ('open_questions' in spec)    validateOpenQuestions(spec.open_questions, push);
 
   return { valid: errors.length === 0, errors };
-}
-
-// Image list validator — shared by the top-level screenshots section, topics,
-// flows, and architecture details. Mirrors `$defs/imageList` in the schema.
-// 12-item cap matches the schema; alt is required for a11y.
-function validateImageList(list, push, path) {
-  if (list === undefined) return;
-  if (!Array.isArray(list)) { push(path, 'must be array'); return; }
-  if (list.length > 12) push(path, 'max 12 items');
-  list.forEach((img, i) => {
-    const p = `${path}[${i}]`;
-    if (!isObj(img)) { push(p, 'must be object'); return; }
-    if (!isStr(img.alt)) push(`${p}.alt`, 'required string (describe the image for screen readers)');
-    if ('src' in img && !isStr(img.src)) push(`${p}.src`, 'must be string (local path or http(s) URL)');
-    if ('caption' in img && !isStr(img.caption)) push(`${p}.caption`, 'must be string');
-    if ('route' in img && !isStr(img.route)) push(`${p}.route`, 'must be string');
-    if ('wait_for' in img && !isStr(img.wait_for)) push(`${p}.wait_for`, 'must be string');
-    if ('full_page' in img && !isBool(img.full_page)) push(`${p}.full_page`, 'must be boolean');
-    if ('viewport' in img) {
-      if (!isObj(img.viewport)) push(`${p}.viewport`, 'must be object');
-      else {
-        if ('width'  in img.viewport && !isInt(img.viewport.width))  push(`${p}.viewport.width`,  'must be integer');
-        if ('height' in img.viewport && !isInt(img.viewport.height)) push(`${p}.viewport.height`, 'must be integer');
-      }
-    }
-    // src is optional at spec-authoring time (capture fills it in) but
-    // src + route together can't BOTH be missing — the renderer has nothing
-    // to display in that case.
-    if (!('src' in img) && !('route' in img)) {
-      push(p, 'must have either `src` (path or URL) or `route` (for the capture script to fill in)');
-    }
-  });
-}
-
-function validateScreenshots(s, push) {
-  if (!isObj(s)) { push('screenshots', 'must be object'); return; }
-  if ('summary' in s && !isStr(s.summary)) push('screenshots.summary', 'must be string');
-  validateHighlights(s.highlights, push, 'screenshots.highlights');
-  validateImageList(s.items, push, 'screenshots.items');
-  if (!Array.isArray(s.items)) push('screenshots.items', 'required array of image objects');
 }
 
 function validateMeta(m, push) {
@@ -148,7 +107,6 @@ function validateSummary(s, push) {
           if ('file' in c && !isStr(c.file)) push(`${cp}.file`, 'must be string');
         });
       }
-      validateImageList(t.images, push, `${p}.images`);
     });
   }
 }
@@ -178,7 +136,6 @@ function validateArchitecture(a, push) {
       const p = `architecture.details.${id}`;
       if (!isObj(d)) { push(p, 'must be object'); continue; }
       if ('status' in d && !STATUS.has(d.status)) push(`${p}.status`, `must be one of ${[...STATUS].join('|')}`);
-      validateImageList(d.images, push, `${p}.images`);
     }
   }
 }
@@ -202,7 +159,6 @@ function validateFlow(f, push, path) {
     if (!isStr(s.to)) push(`${p}.to`, 'required string');
     if (!isStr(s.label)) push(`${p}.label`, 'required string');
   });
-  validateImageList(f.images, push, `${path}.images`);
 }
 
 function validateHighlights(h, push, path) {

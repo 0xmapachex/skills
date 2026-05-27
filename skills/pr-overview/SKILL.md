@@ -50,33 +50,15 @@ full history.
    the diff. Resolve mismatches by fixing the spec, not by ignoring the
    check.
 
-6. **(UI-heavy PRs) Capture screenshots.** When the spec carries image
-   entries with `route` set, run the capture script after the dev server
-   is up:
-
-   ```bash
-   node skills/pr-overview/scripts/capture.mjs tmp/pr-overview-spec.json \
-        --base-url http://localhost:3000
-   ```
-
-   Produces `tmp/pr-overview-spec.captured.json` with image `src` paths
-   filled in. See "Screenshots" below for the full workflow + auth
-   options. Skip this step only when the spec has no image entries with
-   a `route` (i.e. the `screenshots` section was correctly omitted per
-   the trigger rule, or every image already has a hand-supplied `src`).
-
-7. **Render:**
+6. **Render:**
 
    ```bash
    node skills/pr-overview/scripts/render.mjs \
-        tmp/pr-overview-spec.captured.json \
+        tmp/pr-overview-spec.json \
         --out tmp/pr-overview.html
    ```
 
-   (Use the original `tmp/pr-overview-spec.json` directly when no
-   captures ran.)
-
-8. **Report.** Print the path to the user, and a short text recap
+7. **Report.** Print the path to the user, and a short text recap
    mirroring the spec's `summary.tldr` + `summary.ships`. Offer to open
    in browser if the environment supports it.
 
@@ -92,110 +74,7 @@ full history.
 | `database`         | Diff touches `*.sql`, `**/migrations/**`, `drizzle/schema.ts`, `prisma/schema.prisma`, ORM model files, seed scripts, or columns referenced in new query projections.                       |
 | `flow` / `flows`   | Diff adds/changes a route handler, webhook, queue consumer, cron, RPC method, state machine, or multi-step async dance (≥3 calls across files). Threshold: "would a reviewer benefit from seeing actor↔step ordering?" Use `flows: []` (one entry per major flow) whenever the PR ships more than one independent flow — never combine them into a single tangled diagram. Reserve singular `flow: {}` for the single-flow case. |
 | `risk_rollout`     | `database` is present OR diff touches `infra/`, `Dockerfile`, `vercel.ts`/`vercel.json`, GitHub workflows, IAM, or env-var defaults.                                                        |
-| `screenshots`      | **REQUIRED when pre-render check #2 returns ≥1 new `page.tsx` (or framework equivalent).** Also when the diff redesigns existing pages (≥1 `page.tsx` modified with ≥30% line change). Skip only for pure refactors, backend-only diffs, or one-line copy edits — and when skipping despite a check #2 hit, `open_questions` MUST record why (e.g. "dev stack unreachable in CI agent"). See check #8. |
 | `routes`           | Diff adds, removes, or materially changes API route handlers, RPC endpoints, app route handlers, server actions that are treated as endpoints, or route-mounted sub-apps. Include only PR-delta routes; do not list unchanged existing routes unless they are replacements for a removed route. |
-
-## Screenshots
-
-UI-heavy PRs benefit from showing the rendered result alongside the
-diagram-first overview. The skill supports two image surfaces:
-
-- **Top-level `screenshots` section** — gallery rendered right after the
-  executive briefing. Reads as "here's what shipped" at a glance.
-- **Inline images** — optional `images: []` arrays on
-  `summary.topics[]`, each flow, and `architecture.details[*]`. Use these
-  when a screenshot belongs with the prose, not in the gallery.
-
-### Image item shape
-
-Every image, in either surface, follows the same shape:
-
-```jsonc
-{
-  "src":      "screenshots/analytics-overview.png", // local path or http(s) URL
-  "alt":      "Analytics overview with period pill and four KPI cards",  // REQUIRED
-  "caption":  "Period-aware KPIs with comparison deltas.",  // optional, ≤ 120 chars
-  "route":    "/analytics?periodo=14d",  // optional — capture script reads this
-  "viewport": { "width": 1440, "height": 900 },  // capture-only override
-  "wait_for": "[data-loaded]",  // capture-only CSS selector or "networkidle"
-  "full_page": false  // capture-only — false captures the viewport only
-}
-```
-
-The minimum is `{ alt }` plus either `src` (you supply the image) OR
-`route` (capture script fills `src` in). `alt` is non-negotiable: it
-drives both screen-reader access and the placeholder shown when the
-capture hasn't run yet.
-
-### Capture workflow
-
-Capture drives gstack's `/browse` binary (persistent headless Chromium
-daemon, ~3s cold start, ~100ms per command after that). If `/browse`
-isn't installed yet, the capture script bootstraps it once
-(clone + `bash setup`, ~30s) — no `npm i playwright` step, no chromium
-download per consumer, no per-project `node_modules` write.
-
-For routes that need screenshots from a live dev server:
-
-1. **Start the dev server yourself.** Service lifecycle is the agent's job
-   per project (`scripts/dev.sh`, `npm run dev`, `docker compose up`,
-   etc.). The capture script just expects URLs to respond.
-
-2. **Run the capture script:**
-
-   ```bash
-   node skills/pr-overview/scripts/capture.mjs tmp/pr-overview-spec.json \
-        --base-url http://localhost:3000
-   ```
-
-   On first run with no gstack present, the script auto-installs gstack
-   into `~/.claude/skills/gstack/` and builds the `/browse` binary.
-   Pass `--no-install` to fail-fast instead.
-
-   PNGs land in `screenshots/` next to the spec; the script writes
-   `tmp/pr-overview-spec.captured.json` with `src` filled in for every
-   captured image. Pass `--in-place` to rewrite the input spec instead.
-
-3. **Render the captured spec:**
-
-   ```bash
-   node skills/pr-overview/scripts/render.mjs \
-        tmp/pr-overview-spec.captured.json \
-        --out tmp/pr-overview.html
-   ```
-
-4. **Auth.** Most dashboards need login. The capture script detects when
-   a route redirects to a login page, records `capture_error` on that
-   image, and exits 1 with one-time auth instructions. Authenticate once
-   inside the same browse daemon — cookies persist across runs:
-
-   ```bash
-   ~/.claude/skills/gstack/browse/dist/browse handoff "log in to your dev app"
-   # log in in the Chrome window that opened
-   ~/.claude/skills/gstack/browse/dist/browse resume
-   ```
-
-   Then rerun the capture command — subsequent navigations reuse the
-   session cookies. No `storage-state` files to manage, no `codegen`
-   recording, no fingerprint-fragile state to ship between machines.
-
-The rendered HTML inlines every local image as base64 so the file stays
-self-contained. http(s) `src` values pass through and resolve when the
-page is viewed online.
-
-### When to use which surface
-
-- **Top-level gallery (`screenshots`)** — "What ships" view. 3–8
-  hero shots of the new surfaces. Captions one line each.
-- **`summary.topics[].images`** — when a topic explains a specific UI
-  invariant (e.g. "OAuth consent screen", "Empty-state copy"); embed the
-  image alongside the prose so the reviewer sees what it describes.
-- **`flows[].images`** — when a flow has a key visual moment (the page
-  the user lands on, the modal that appears). One or two per flow at
-  most; the sequence diagram is still the load-bearing artifact.
-- **`architecture.details[*].images`** — surfaces specific to a single
-  arch node; shown when the reviewer clicks the node and opens the
-  detail panel.
 
 ## Pre-render verification
 
@@ -350,28 +229,6 @@ additive schema change has a migration story.
    changed"), produce the actual list or command output. If the number
    cannot be reproduced, remove or rewrite the claim.
 
-8. **Screenshots presence (forcing).** This check has no flexibility —
-   it exists because skipping screenshots is the easiest section to
-   silently rationalize past. If check #2 returned ≥1 new `page.tsx`,
-   the spec MUST satisfy one of:
-
-   a. A top-level `screenshots` section with ≥1 item covering the new
-      pages (3–8 hero shots is the recommended cap), OR
-   b. Inline `images: []` on the `summary.topics[]` /
-      `architecture.details[*]` entries that own those pages, with at
-      least one image per shipped surface, OR
-   c. An explicit entry in `open_questions` of the form:
-      `"Screenshots skipped — <concrete reason>"`. Acceptable reasons:
-      "dev stack unreachable", "auth credentials unavailable",
-      "non-interactive environment". Unacceptable reasons: "would take
-      time", "judgment call", "PR is large".
-
-   "I'll skip captures and add them in a follow-up" is not acceptable —
-   either add the section with `route` placeholders (the renderer shows
-   alt-text placeholders until captures run) or record the skip-reason
-   in `open_questions`. The reviewer needs to know whether the gallery
-   is absent by intent or by omission.
-
 Run these checks in one pass and keep a private `STATUS / MISMATCH / FIX`
 log while editing the spec. Do not render until the mismatches are gone.
 
@@ -392,11 +249,6 @@ log while editing the spec. Do not render until the mismatches are gone.
 6. **Risk/question identifiers are anchored.** If `risk_rollout` or
    `open_questions` names an identifier, the main explanatory sections
    must contain enough context for that identifier.
-7. **Screenshots are not silently optional.** Any PR that adds a new
-   `page.tsx` (or framework equivalent) MUST either ship the
-   `screenshots` section or record an explicit skip-reason in
-   `open_questions`. See pre-render check #8 — there is no third
-   option.
 
 ## Edge cases
 

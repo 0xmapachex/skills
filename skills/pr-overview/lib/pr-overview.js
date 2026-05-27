@@ -118,7 +118,6 @@
   const main = document.querySelector('[data-sections]');
   const RENDERERS = {
     summary:           { label: 'Why this exists',  render: renderWhy },
-    screenshots:       { label: 'Screenshots',      render: renderScreenshots },
     architecture:      { label: 'The big picture',  render: renderArchitecture },
     flow:              { label: 'How it flows',     render: renderFlow },
     database:          { label: 'Database changes', render: renderDatabase },
@@ -130,7 +129,6 @@
   // the inlined JS source — and so this stays self-documenting.
   const ANCHORS = {
     summary:           'section-summary',
-    screenshots:       'section-screenshots',
     architecture:      'section-architecture',
     flow:              'section-flow',
     database:          'section-database',
@@ -166,7 +164,7 @@
 
     // section
     const section = el('section', {
-      class: 'section' + (key === 'architecture' || key === 'flow' || key === 'database' || key === 'routes' || key === 'screenshots' ? ' section--wide' : ''),
+      class: 'section' + (key === 'architecture' || key === 'flow' || key === 'database' || key === 'routes' ? ' section--wide' : ''),
       id: anchor,
     }, [
       el('div', { class: 'kicker' }, [
@@ -336,119 +334,9 @@
         body.appendChild(block);
       });
     }
-    if (Array.isArray(t.images) && t.images.length) {
-      body.appendChild(renderImageGrid(t.images, { class: 'why-topic__images' }));
-    }
     card.appendChild(body);
     return card;
   }
-
-  // ---------- screenshots ----------
-  // Top-level visual gallery. Surfaces the new UI right after the executive
-  // briefing so reviewers see what shipped before scrolling into the
-  // architecture diagram. Same framing contract as every other section: lede
-  // sentence + 2-4 highlight bullets, then the grid.
-  function renderScreenshots(host, payload) {
-    if (payload.summary) {
-      const p = el('p', { class: 'arch-summary' });
-      appendInlineCode(p, payload.summary);
-      host.appendChild(p);
-    }
-    if (Array.isArray(payload.highlights) && payload.highlights.length) {
-      const ul = el('ul', { class: 'arch-highlights' });
-      payload.highlights.forEach((h) => {
-        const li = el('li', {});
-        appendInlineCode(li, h);
-        ul.appendChild(li);
-      });
-      host.appendChild(ul);
-    }
-    if (Array.isArray(payload.items) && payload.items.length) {
-      host.appendChild(renderImageGrid(payload.items, { class: 'screenshots-grid' }));
-    }
-  }
-
-  // Shared image-grid renderer used by the top-level gallery, topic cards,
-  // and (later) inline flow images. Missing src (capture not yet run) shows
-  // a placeholder card so the spec still validates and renders during
-  // authoring.
-  function renderImageGrid(images, opts = {}) {
-    const grid = el('div', { class: opts.class || 'image-grid' });
-    images.forEach((img) => grid.appendChild(renderImageCard(img)));
-    return grid;
-  }
-
-  function renderImageCard(img) {
-    const card = el('figure', { class: 'image-card' });
-    if (img.src) {
-      const wrap = el('button', {
-        type: 'button',
-        class: 'image-card__btn',
-        'data-image-zoom': '1',
-        'data-image-src': img.src,
-        'data-image-alt': img.alt || '',
-        'data-image-caption': img.caption || '',
-        'aria-label': 'Open full-size image',
-      });
-      wrap.appendChild(el('img', { src: img.src, alt: img.alt || '', loading: 'lazy' }));
-      card.appendChild(wrap);
-    } else {
-      // Capture script hasn't run yet — show a placeholder so the spec is
-      // still legible during authoring. The route, if present, hints at
-      // what the eventual screenshot will show.
-      const stub = el('div', { class: 'image-card__stub' }, [
-        el('span', { class: 'image-card__stub-tag' }, 'screenshot pending'),
-        el('span', { class: 'image-card__stub-hint' }, img.route || img.alt || ''),
-      ]);
-      card.appendChild(stub);
-    }
-    if (img.caption || img.route) {
-      const cap = el('figcaption', { class: 'image-card__caption' });
-      if (img.caption) appendInlineCode(cap, img.caption);
-      if (img.route) {
-        const r = el('span', { class: 'image-card__route' }, img.route);
-        cap.appendChild(r);
-      }
-      card.appendChild(cap);
-    }
-    return card;
-  }
-
-  // ---------- lightbox ----------
-  // Click-to-zoom for any image rendered via renderImageCard. Set up once on
-  // first click; the lightbox lives directly on <body> so it overlays the
-  // detail panel and the section content alike.
-  let _lightbox = null;
-  function ensureLightbox() {
-    if (_lightbox) return _lightbox;
-    const box = el('div', { class: 'lightbox', 'data-lightbox': '1', hidden: '' });
-    const inner = el('div', { class: 'lightbox__inner' });
-    const closer = el('button', { type: 'button', class: 'lightbox__close', 'aria-label': 'Close' }, '×');
-    const img = el('img', { class: 'lightbox__img', alt: '' });
-    const cap = el('div', { class: 'lightbox__caption' });
-    inner.appendChild(img);
-    inner.appendChild(cap);
-    box.appendChild(closer);
-    box.appendChild(inner);
-    document.body.appendChild(box);
-    const close = () => { box.hidden = true; };
-    closer.addEventListener('click', close);
-    box.addEventListener('click', (e) => { if (e.target === box) close(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
-    _lightbox = { box, img, cap };
-    return _lightbox;
-  }
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest?.('[data-image-zoom]');
-    if (!btn) return;
-    const { box, img, cap } = ensureLightbox();
-    img.src = btn.getAttribute('data-image-src') || '';
-    img.alt = btn.getAttribute('data-image-alt') || '';
-    const caption = btn.getAttribute('data-image-caption') || '';
-    cap.textContent = caption;
-    cap.style.display = caption ? '' : 'none';
-    box.hidden = false;
-  });
 
   // Architecture is rendered via Mermaid flowchart. Subgraphs group nodes by
   // kind (ui / service / module / datastore / external / job) so the graph
@@ -667,17 +555,6 @@
       const files = (d?.files ?? []).map((f) => `<span class="file-chip">${escapeHTML(f)}</span>`).join(' ');
       const resp  = (d?.responsibilities ?? []).map((r) => `<li>${escapeHTML(r)}</li>`).join('');
       const status = d?.status ?? (n.changed ? 'changed' : 'context');
-      // Images render as zoomable thumbnails inside the detail panel; the
-      // same data-image-zoom hook the gallery uses fires the lightbox.
-      const imagesMarkup = (Array.isArray(d?.images) && d.images.length)
-        ? `<h4>Screenshots</h4><div class="detail-images">${d.images.map((img) => {
-            const src = escapeHTML(img.src || '');
-            const alt = escapeHTML(img.alt || '');
-            const cap = escapeHTML(img.caption || '');
-            if (!img.src) return `<div class="detail-images__stub">screenshot pending${img.route ? ` · ${escapeHTML(img.route)}` : ''}</div>`;
-            return `<button type="button" class="detail-images__btn" data-image-zoom="1" data-image-src="${src}" data-image-alt="${alt}" data-image-caption="${cap}"><img src="${src}" alt="${alt}" loading="lazy"></button>`;
-          }).join('')}</div>`
-        : '';
       window.__archDetail[mmdHost.id + ':' + n.id] = `
         <h3>${escapeHTML(n.label)}</h3>
         <p>
@@ -687,7 +564,6 @@
         ${d?.summary ? `<p>${escapeHTML(d.summary)}</p>` : ''}
         ${resp ? `<h4>Responsibilities</h4><ul>${resp}</ul>` : ''}
         ${files ? `<h4>Files</h4><div class="spec__files">${files}</div>` : ''}
-        ${imagesMarkup}
       `;
     });
 
@@ -1083,9 +959,6 @@
         ul.appendChild(li);
       });
       host.appendChild(ul);
-    }
-    if (Array.isArray(f.images) && f.images.length) {
-      host.appendChild(renderImageGrid(f.images, { class: 'flow-mmd__images' }));
     }
 
     const id = 'flow-mmd-' + Math.random().toString(36).slice(2, 9);

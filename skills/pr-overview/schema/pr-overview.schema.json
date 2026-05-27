@@ -6,31 +6,6 @@
   "required": ["meta", "summary", "architecture", "open_questions"],
   "additionalProperties": false,
   "$defs": {
-    "image": {
-      "type": "object",
-      "required": ["alt"],
-      "properties": {
-        "src":      { "type": "string", "minLength": 1, "description": "Local path (relative to the spec file or absolute) or an http(s) URL. Local paths get inlined as base64 by the renderer." },
-        "alt":      { "type": "string", "minLength": 1, "description": "Required for accessibility — describe the image content in one sentence." },
-        "caption":  { "type": "string", "description": "Optional one-line caption shown beneath the image." },
-        "route":    { "type": "string", "description": "Path under the capture base URL — used by scripts/capture.mjs to fetch + screenshot. Ignored at render time." },
-        "viewport": {
-          "type": "object",
-          "description": "Capture-only — viewport dimensions for the headless browser.",
-          "properties": {
-            "width":  { "type": "integer", "minimum": 320 },
-            "height": { "type": "integer", "minimum": 240 }
-          }
-        },
-        "wait_for": { "type": "string", "description": "Capture-only — CSS selector or `networkidle` to wait for before screenshotting." },
-        "full_page": { "type": "boolean", "description": "Capture-only — screenshot the entire scrollable page (default false; only the viewport is captured)." }
-      }
-    },
-    "imageList": {
-      "type": "array",
-      "maxItems": 12,
-      "items": { "$ref": "#/$defs/image" }
-    },
     "routeParameter": {
       "type": "object",
       "required": ["name", "in", "description"],
@@ -132,21 +107,10 @@
                     "body": { "type": "string" }
                   }
                 }
-              },
-              "images": { "$ref": "#/$defs/imageList" }
+              }
             }
           }
         }
-      }
-    },
-    "screenshots": {
-      "type": "object",
-      "required": ["items"],
-      "description": "Top-level visual gallery — most useful for UI-heavy PRs where the diff is hard to picture from prose alone. Rendered near the top of the document below the executive briefing.",
-      "properties": {
-        "summary":    { "type": "string", "description": "One-sentence lede, plain English." },
-        "highlights": { "type": "array", "items": { "type": "string" }, "maxItems": 5 },
-        "items":      { "$ref": "#/$defs/imageList" }
       }
     },
     "architecture": {
@@ -189,8 +153,7 @@
               "summary":          { "type": "string" },
               "files":            { "type": "array", "items": { "type": "string" } },
               "responsibilities": { "type": "array", "items": { "type": "string" } },
-              "status":           { "enum": ["added", "changed", "removed", "context"] },
-              "images":           { "$ref": "#/$defs/imageList" }
+              "status":           { "enum": ["added", "changed", "removed", "context"] }
             }
           }
         }
@@ -203,7 +166,6 @@
         "title":      { "type": "string" },
         "summary":    { "type": "string" },
         "highlights": { "type": "array", "items": { "type": "string" }, "maxItems": 5 },
-        "images":     { "$ref": "#/$defs/imageList" },
         "actors": {
           "type": "array",
           "items": {
