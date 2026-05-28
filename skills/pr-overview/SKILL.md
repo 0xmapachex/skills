@@ -33,9 +33,15 @@ full history.
    - If you cannot infer it, **ask the user**. Do not silently default to
      `main`.
 
-2. **Read the diff.**
+2. **Read the diff AND the commit history.**
    - `git diff --stat`, `git diff --name-only`, then focused
      `git diff <base>...HEAD -- <path>` for the files that matter.
+   - Also `git log <base>..HEAD --oneline --no-merges` to see how the
+     branch was assembled. If the conventional-commit `type(scope):`
+     prefixes diverge from the PR title's scope, the branch bundles
+     work that did not land on the base as separate PRs — pre-render
+     check #9 will require you to attribute each bundled theme to its
+     originating commit instead of folding everything under the title.
 
 3. **Detect which optional sections apply.** See "Section triggers" below.
 
@@ -323,6 +329,49 @@ additive schema change has a migration story.
    in `open_questions`. The reviewer needs to know whether the gallery
    is absent by intent or by omission.
 
+9. **PR scope vs commit history (forcing).** `git diff <base>...HEAD`
+   tells you what lands when the PR merges, but it cannot distinguish
+   the PR's *titled feature* from older commits that hitched a ride on
+   a long-running integration branch. The overview must not silently
+   attribute the entire diff to the PR's title. Run:
+
+   ```bash
+   git log <base>..HEAD --oneline --no-merges
+   ```
+
+   Group commits by conventional-commit `type(scope):` prefix (or by
+   subject if the repo doesn't use conventional commits). If the PR
+   title's scope is only one of several materially different scopes in
+   the list — e.g. PR titled `feat(agent): …` but the branch also has
+   `feat(product): …`, `feat(admin): …`, `refactor(api): …` — then for
+   every large surface in the spec (new tables, new pages, new
+   modules), the originating commit MUST be either the PR's titled
+   commit OR explicitly attributed to a bundled commit.
+
+   The spec MUST satisfy one of:
+
+   a. A `summary.topics[]` entry titled "PR scope" (or similar) that
+      names each bundled theme and the commit SHA(s) that introduced
+      it, so the reviewer can see at a glance what the PR title covers
+      vs what was layered in earlier. The TL;DR must then frame the
+      shipped work as "the named feature, plus bundled work A and B",
+      not as a single deliverable. OR
+   b. An explicit `open_questions` entry of the form:
+      `` "PR title (`<title>`) covers a subset of the diff. Other major
+      work bundled in: <theme-a> (<sha>), <theme-b> (<sha>). Consider
+      splitting before review." ``
+
+   When the commit history is homogeneous — all commits share one
+   `type(scope):` prefix, or are clearly the same feature stack
+   (`feat`, then `fix(...)` / `test(...)` / `refactor(...)` for the
+   same area) — this check passes with nothing to do.
+
+   Reverse direction also matters: if a `summary.ships` item names a
+   surface (table, module, page) that does NOT appear in any commit's
+   diff range between `<base>..HEAD`, remove the claim. Use
+   `git log <base>..HEAD -- <path>` to verify which commit introduced
+   each load-bearing surface before claiming the PR ships it.
+
 Run these checks in one pass and keep a private `STATUS / MISMATCH / FIX`
 log while editing the spec. Do not render until the mismatches are gone.
 
@@ -348,6 +397,15 @@ log while editing the spec. Do not render until the mismatches are gone.
    `screenshots` section or record an explicit skip-reason in
    `open_questions`. See pre-render check #8 — there is no third
    option.
+8. **PR scope vs commit history is reconciled.** A branch that has
+   bundled multiple unrelated features (e.g. earlier `feat(product)`
+   commits living alongside the titled `feat(agent)` commit) MUST be
+   surfaced to the reviewer rather than silently flattened into the
+   title. The TL;DR and `summary.ships` describe the named feature; a
+   `summary.topics[]` entry (or an explicit `open_questions` line)
+   attributes every large bundled surface to its originating commit
+   SHA. See pre-render check #9. A surface that appears in NO commit's
+   diff between `<base>..HEAD` cannot be claimed as shipped.
 
 ## Edge cases
 
