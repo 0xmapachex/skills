@@ -4,6 +4,7 @@ Claude and Codex compatible skills published by `0xmapachex`.
 
 ## Skills
 
+- `ad-creative-studio` - produce polished, on-brand social media image ads for any company. Claude orchestrates; Codex `gpt-5.5` generates a text-free photo via its built-in `image_gen` tool; the brand layer (headline, logo, offer, CTA) is composited deterministically in HTML.
 - `ngrok-tunnel` - expose a local port to the internet on a stable free ngrok static domain.
 - `pr-db-review-overview` - create complete PR overviews with special handling for database, migration, schema, ORM, seed, and data-model changes.
 
@@ -59,6 +60,11 @@ cp -R /tmp/mapache-skills/skills/pr-db-review-overview ~/.claude/skills/
 ├── .codex-plugin/
 │   └── plugin.json
 ├── skills/
+│   ├── ad-creative-studio/
+│   │   ├── SKILL.md
+│   │   ├── references/
+│   │   ├── templates/
+│   │   └── scripts/
 │   ├── ngrok-tunnel/
 │   │   ├── SKILL.md
 │   │   ├── agents/openai.yaml
