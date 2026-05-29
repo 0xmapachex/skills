@@ -10,8 +10,8 @@
     {
       "name": "mapache-skills",
       "source": ".",
-      "description": "Skill collection for local tunneling and PR database-change reviews.",
-      "version": "1.1.0",
+      "description": "Skill collection for marketing ad creative, local tunneling, and PR database-change reviews.",
+      "version": "1.2.0",
       "author": {
         "name": "0xmapachex"
       },
@@ -23,6 +23,12 @@
         "skills",
         "claude",
         "codex",
+        "ad-creative",
+        "marketing",
+        "social-ads",
+        "instagram",
+        "image-generation",
+        "imagegen",
         "ngrok",
         "tunnel",
         "webhooks",
