@@ -588,6 +588,13 @@ Key invariants:
   color-coded", "drag any table"); describe the change: which tables
   are new, which columns are added, which constraint is introduced,
   which migration backfills what.
+- **Never ship a lone table with no relationships.** A single
+  `status: changed`/`added` table floating by itself reads as "what is
+  this connected to?" — the reviewer gets no context. When a table has a
+  foreign key, include its FK-parent as a `status: context` table and add
+  the `relations[]` entry (`{ from: "child.fk", to: "parent.id", status }`)
+  so the diagram shows the edge. This is the DB-section corollary of hard
+  rule #3: context tables earn their place by explaining a relationship.
 - Flow actor `kind` ∈ `user | service | module | datastore | external` —
   intentionally narrower than architecture node kinds (no `ui` or `job`
   here; use `service` for those actors when their architectural kind is
