@@ -567,16 +567,31 @@
       return words.length <= 4 ? words.join(' ') : words.slice(0, 3).join(' ') + '…';
     };
     a.edges.forEach((e) => {
-      const arrow =
-        e.kind === 'async' ? '-. ' :
-        e.kind === 'data'  ? '== ' :
-                              '-- ';
-      const close =
-        e.kind === 'async' ? ' .-> ' :
-        e.kind === 'data'  ? ' ==> ' :
-                              ' --> ';
       const label = e.label ? `"${esc(truncateLabel(e.label))}"` : '';
-      lines.push(`  ${sid(e.from)} ${arrow}${label}${close}${sid(e.to)}`);
+      // Unlabeled links MUST use the bare connector form (`A --> B`, `A -.-> B`,
+      // `A ==> B`). The labeled form splits the connector around the text
+      // (`A -- "x" --> B`); emitting it with an empty label produces
+      // `A --  --> B`, which Mermaid rejects as a syntax error — and a single
+      // failed parse takes down every other diagram on the page (the flow
+      // sequence diagrams render blank/overlapping when the arch graph throws).
+      let connector;
+      if (label) {
+        const arrow =
+          e.kind === 'async' ? '-. ' :
+          e.kind === 'data'  ? '== ' :
+                                '-- ';
+        const close =
+          e.kind === 'async' ? ' .-> ' :
+          e.kind === 'data'  ? ' ==> ' :
+                                ' --> ';
+        connector = `${arrow}${label}${close}`;
+      } else {
+        connector =
+          e.kind === 'async' ? ' -.-> ' :
+          e.kind === 'data'  ? ' ==> ' :
+                                ' --> ';
+      }
+      lines.push(`  ${sid(e.from)} ${connector}${sid(e.to)}`);
     });
 
     // Status colors via classDef. Boosted contrast so the difference between

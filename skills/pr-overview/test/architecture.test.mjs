@@ -42,3 +42,28 @@ test('arch renderer wires click handlers to the detail panel', () => {
   assert.ok(html.includes('__archDetailFor'),       'arch detail click handler missing');
   assert.ok(html.includes('click ${sid(n.id)}'),    'mermaid click directive template missing');
 });
+
+test('arch renderer emits a bare connector for unlabeled edges', () => {
+  // Regression: an edge with no `label` must NOT be built by interpolating an
+  // empty label into the labeled connector form. The old code did
+  // `${arrow}${label}${close}` unconditionally, so a label-less edge produced
+  // `n_a --  --> n_b`, which Mermaid rejects as a syntax error. One failed
+  // parse blanks the arch graph AND cascades into the flow sequence diagrams
+  // (they render overlapping/empty). The fix branches on label presence and
+  // emits a bare `A --> B` / `A -.-> B` / `A ==> B` when there is no label.
+  const html = renderHTML(FIXTURE);
+  // The buggy form pushed the edge line by interpolating `label` directly, so a
+  // missing label collapsed to `--  -->`. The push must now route through a
+  // pre-computed `connector` instead.
+  assert.ok(
+    !html.includes('${sid(e.from)} ${arrow}${label}${close}${sid(e.to)}'),
+    'edge push still interpolates a possibly-empty label — unlabeled edges will emit `--  -->` and break Mermaid',
+  );
+  assert.ok(
+    html.includes('${sid(e.from)} ${connector}${sid(e.to)}'),
+    'edge push should use a pre-computed connector that is bare when the label is empty',
+  );
+  // The bare-connector branch must be present for each link kind.
+  assert.ok(html.includes("e.kind === 'async' ? ' -.-> ' :"), 'bare async connector branch missing');
+  assert.ok(html.includes("e.kind === 'data'  ? ' ==> ' :"),  'bare data connector branch missing');
+});
