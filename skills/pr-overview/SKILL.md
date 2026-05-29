@@ -6,8 +6,10 @@ description: Generate a complete interactive HTML overview of a PR — executive
 # PR Overview
 
 Generate an interactive, self-contained HTML walkthrough of a pull request.
-Output goes to `tmp/pr-overview.html` and is fully offline (CSS, JS, and the
-panzoom library are inlined into one file).
+Output goes to `tmp/pr-overview.html` and is fully offline: CSS, JS, the
+panzoom library, and Mermaid are all inlined into one file (only Google Fonts
+load from the network, and they degrade to a system fallback). Diagrams render
+with no network access.
 
 ## Diff Scope Rule
 

@@ -1185,6 +1185,17 @@
     return lines.join('\n');
   }
 
+  // Mermaid keeps GLOBAL per-diagram-type parser state, so two sequenceDiagram
+  // renders running concurrently corrupt each other's participant list (flow
+  // B's actors leak into flow A's SVG). With multiple flows, renderFlow fires
+  // every renderOnce() synchronously, kicking off overlapping async runs. Chain
+  // them through this module-level queue so only one initialize()+run() pair is
+  // ever in flight.
+  // NB: declared with `var` (not `let`) on purpose — the section-mount loop
+  // runs near the top of this module and can call runMermaidSequence before
+  // execution reaches this line. `let` would put it in the temporal dead zone
+  // and throw; `var` hoists to `undefined`, and the guard below tolerates that.
+  var __mmdSeqChain;
   function runMermaidSequence(mmdHost, afterRender) {
     const init = () => {
       const theme = document.documentElement.getAttribute('data-theme') || 'paper';
@@ -1248,13 +1259,17 @@
           sequenceNumberColor: '#161b22',
         },
       });
-      window.mermaid.run({ nodes: [mmdHost] }).then(afterRender || (() => {}));
+      return window.mermaid.run({ nodes: [mmdHost] }).then(afterRender || (() => {}));
     };
-    if (window.mermaid) init();
-    else {
-      const wait = () => window.mermaid ? init() : setTimeout(wait, 30);
-      wait();
-    }
+    const start = () => {
+      if (window.mermaid) return init();
+      return new Promise((resolve) => {
+        const wait = () => (window.mermaid ? resolve(init()) : setTimeout(wait, 30));
+        wait();
+      });
+    };
+    // Serialize: never let two sequence renders parse at the same time.
+    __mmdSeqChain = (__mmdSeqChain || Promise.resolve()).then(start, start);
   }
 
   function renderDatabase(host, d) {

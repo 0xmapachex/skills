@@ -27,15 +27,43 @@ test('embeds the spec verbatim as window.__PR_OVERVIEW_DATA__', () => {
   assert.ok(html.includes(JSON.stringify(FIXTURE)), 'spec JSON not found in output');
 });
 
-test('only well-known external resources are referenced (fonts + mermaid)', () => {
+test('only well-known external resources are referenced (fonts only)', () => {
   const html = renderToString(FIXTURE);
-  // Allowed externals: Google Fonts <link>, jsDelivr Mermaid <script>.
-  // Anything else is a regression.
-  const ALLOWED = /fonts\.googleapis\.com|fonts\.gstatic\.com|cdn\.jsdelivr\.net\/npm\/mermaid/;
+  // The ONLY allowed externals are Google Fonts (which degrade gracefully to a
+  // system fallback). Scripts must all be inline — Mermaid is now vendored and
+  // inlined, so no external <script src> is permitted. Anything else is a
+  // regression away from the self-contained guarantee.
+  const ALLOWED = /fonts\.googleapis\.com|fonts\.gstatic\.com/;
   const linkMatches = html.match(/<link\s+[^>]*href="([^"]+)"/g) || [];
   const scriptMatches = html.match(/<script\s+[^>]*src="([^"]+)"/g) || [];
   const bad = [...linkMatches, ...scriptMatches].filter((m) => !ALLOWED.test(m));
   assert.deepEqual(bad, [], 'unexpected external resource(s): ' + bad.join(', '));
+});
+
+test('Mermaid is inlined, not loaded from a CDN', () => {
+  const html = renderToString(FIXTURE);
+  // No external Mermaid <script src> may remain.
+  assert.ok(
+    !/<script[^>]*src=["'][^"']*mermaid/i.test(html),
+    'found an external Mermaid <script src> — it must be inlined',
+  );
+  assert.ok(!html.includes('cdn.jsdelivr.net/npm/mermaid'), 'jsDelivr Mermaid reference present');
+  // The vendored bundle ends by assigning the global; its presence proves the
+  // library was inlined into the page.
+  assert.ok(
+    html.includes('globalThis.mermaid'),
+    'inlined Mermaid bundle not found in output',
+  );
+});
+
+test('serializes Mermaid sequence renders to avoid cross-flow contamination', () => {
+  // Regression guard for the bug where concurrent mermaid.run() calls shared
+  // global parser state and leaked one flow's participants into another's SVG.
+  const html = renderToString(FIXTURE);
+  assert.ok(
+    html.includes('__mmdSeqChain'),
+    'expected the serialized Mermaid render queue (__mmdSeqChain) in the inlined JS',
+  );
 });
 
 test('throws on invalid spec', () => {
