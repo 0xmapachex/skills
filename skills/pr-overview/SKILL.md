@@ -32,6 +32,19 @@ full history.
      the likely base.
    - If you cannot infer it, **ask the user**. Do not silently default to
      `main`.
+   - **Never diff against a local branch without confirming it's current
+     with its remote.** A stale local `main` (behind `origin/main` by N
+     commits) silently inflates the diff: you get the whole backlog of
+     already-merged work, not the PR. `git fetch` first, then diff against
+     `origin/main` (or the real base), not the local ref. Tell-tale sign:
+     `git log <base>..HEAD` shows release/merge commits that obviously
+     predate this PR.
+   - **Sanity-check the file count against expectation.** If the diff is far
+     larger than the PR should be (hundreds of files for a small feature),
+     stop — the base is wrong. Two usual causes: (a) a stale local base ref,
+     or (b) the PR actually targets a different base branch than `main`
+     (a stacked/feature base, or a fork). Confirm the base with the user
+     before building the spec rather than describing the wrong range.
 
 2. **Read the diff AND the commit history.**
    - `git diff --stat`, `git diff --name-only`, then focused
