@@ -14,10 +14,20 @@ const TEMPLATE_PATH = join(SKILL_ROOT, 'templates', 'overview.html');
 const CSS_PATH      = join(SKILL_ROOT, 'lib', 'pr-overview.css');
 const JS_PATH       = join(SKILL_ROOT, 'lib', 'pr-overview.js');
 const PANZOOM_PATH  = join(SKILL_ROOT, 'lib', 'vendor', 'panzoom.min.js');
+const MERMAID_PATH  = join(SKILL_ROOT, 'lib', 'vendor', 'mermaid.min.js');
 
-const CSS_MARK  = '/* __INLINE_CSS__ */';
-const JS_MARK   = '/* __INLINE_JS__ */';
-const DATA_MARK = '/* __INLINE_DATA__ */ null';
+const CSS_MARK     = '/* __INLINE_CSS__ */';
+const JS_MARK      = '/* __INLINE_JS__ */';
+const DATA_MARK    = '/* __INLINE_DATA__ */ null';
+const MERMAID_MARK = '/* __INLINE_MERMAID__ */';
+
+// Neutralize any literal `</script>` inside an inlined script payload so it
+// can't terminate the surrounding <script> tag early. Vendored Mermaid does
+// not currently contain the sequence, but a future bump might — escape it so
+// the inline-script approach stays safe regardless.
+function escapeScriptClose(js) {
+  return js.replace(/<\/(script)/gi, '<\\/$1');
+}
 
 const MIME_BY_EXT = {
   '.png':  'image/png',
@@ -104,6 +114,13 @@ export function render(specPath, outPath) {
   const css      = readIfExists(CSS_PATH);
   const panzoom  = readIfExists(PANZOOM_PATH);
   const js       = readIfExists(JS_PATH);
+  const mermaid  = readIfExists(MERMAID_PATH);
+  if (!mermaid) {
+    throw new Error(
+      `vendored Mermaid not found at ${MERMAID_PATH}. Diagrams require it to be ` +
+      `inlined for an offline, self-contained render.`,
+    );
+  }
 
   // Use function replacements so `$`-sequences in the injected payloads are
   // inserted literally. `String.prototype.replace` with a *string* second arg
@@ -114,6 +131,7 @@ export function render(specPath, outPath) {
   // whole template (it duplicated the entire <body>). Function replacements are
   // not subject to `$` substitution, so the payload lands verbatim.
   const html = template
+    .replace(MERMAID_MARK, () => escapeScriptClose(mermaid))
     .replace(CSS_MARK, () => css)
     .replace(DATA_MARK, () => JSON.stringify(spec))
     .replace(JS_MARK, () => `${panzoom}\n;${js}`);
