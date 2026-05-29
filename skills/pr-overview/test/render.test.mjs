@@ -43,6 +43,23 @@ test('throws on invalid spec', () => {
   assert.throws(() => renderToString(bad), /required/);
 });
 
+test('payload with $-replacement patterns does not splice the template', () => {
+  // Regression: render injected payloads via String.replace(mark, string),
+  // which interprets `$&`, `` $` ``, `$'`, `$$` as special replacement
+  // patterns. A spec containing a backtick-wrapped regex ending in `$`
+  // (common: `^[A-Z]+$`) emits `` $` `` in the JSON, which expanded to
+  // "everything before the match" — duplicating the entire <body>.
+  const spec = JSON.parse(JSON.stringify(FIXTURE));
+  // Exercise every dangerous sequence: ...+$` (dollar-backtick), $&, $', $$.
+  spec.summary.tldr = 'Validated against `^[A-Z0-9]+$` with $& $\' and $$ tokens.';
+  const html = renderToString(spec);
+  const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/g, '');
+  const bodyOpens = (withoutScripts.match(/<body/g) || []).length;
+  assert.equal(bodyOpens, 1, `expected exactly one <body>, got ${bodyOpens}`);
+  // The data payload must land verbatim — proof no `$`-splice mangled it.
+  assert.ok(html.includes(JSON.stringify(spec)), 'spec JSON corrupted in output');
+});
+
 // 1×1 transparent PNG, base64-encoded.
 const TINY_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==';
 
