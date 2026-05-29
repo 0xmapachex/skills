@@ -105,10 +105,18 @@ export function render(specPath, outPath) {
   const panzoom  = readIfExists(PANZOOM_PATH);
   const js       = readIfExists(JS_PATH);
 
+  // Use function replacements so `$`-sequences in the injected payloads are
+  // inserted literally. `String.prototype.replace` with a *string* second arg
+  // interprets `$&`, `` $` ``, `$'`, `$$`, `$n` as special replacement
+  // patterns — e.g. a spec containing the regex `^[A-Z]+$` wrapped in
+  // backticks emits `` $` `` (dollar-backtick) in the JSON, which `replace`
+  // expands to "everything before the match", splicing a duplicate copy of the
+  // whole template (it duplicated the entire <body>). Function replacements are
+  // not subject to `$` substitution, so the payload lands verbatim.
   const html = template
-    .replace(CSS_MARK, css)
-    .replace(DATA_MARK, JSON.stringify(spec))
-    .replace(JS_MARK, `${panzoom}\n;${js}`);
+    .replace(CSS_MARK, () => css)
+    .replace(DATA_MARK, () => JSON.stringify(spec))
+    .replace(JS_MARK, () => `${panzoom}\n;${js}`);
 
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html, 'utf8');

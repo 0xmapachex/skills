@@ -156,9 +156,24 @@ download per consumer, no per-project `node_modules` write.
 
 For routes that need screenshots from a live dev server:
 
-1. **Start the dev server yourself.** Service lifecycle is the agent's job
-   per project (`scripts/dev.sh`, `npm run dev`, `docker compose up`,
-   etc.). The capture script just expects URLs to respond.
+1. **Get the target page responding — with the least infra that works.**
+   The capture script only needs the route to return HTML; it does not need
+   the app's full backing stack. Before standing anything up, check whether a
+   dev server is already running, then prefer the lightest path:
+   - **Reuse a running server** if one is already up (check the project's
+     dev launcher / known ports). Don't relaunch.
+   - **Prefer the app's dev/mock modes** over real dependencies. Most apps
+     expose env flags to stub external calls (Slack, Stripe, KMS, third-party
+     APIs) — e.g. a `*_MOCK_*=1` flag returning fixed fixtures. Use those so
+     the page renders without wiring live credentials or extra services.
+   - **Only stand up what the target page actually reads from.** A page that
+     renders from one datastore does not need the whole `docker compose up`
+     world. Don't boot a database / queue / worker the screenshot never
+     touches. (You usually do **not** need to spin up Docker just to
+     screenshot a single page — reach for it only if the page genuinely can't
+     render without it.)
+   - **Tear down anything you started** once captures are done; leave the
+     environment as you found it.
 
 2. **Run the capture script:**
 
@@ -183,10 +198,39 @@ For routes that need screenshots from a live dev server:
         --out tmp/pr-overview.html
    ```
 
-4. **Auth.** Most dashboards need login. The capture script detects when
-   a route redirects to a login page, records `capture_error` on that
-   image, and exits 1 with one-time auth instructions. Authenticate once
-   inside the same browse daemon — cookies persist across runs:
+4. **Auth.** Most dashboards need login. The capture script detects when a
+   route redirects to a login page, records `capture_error` on that image,
+   and exits 1. Whatever you do, authenticate **inside the same browse
+   daemon** the capture script uses (`~/.claude/skills/gstack/browse/dist/browse`)
+   — its cookies persist across runs, so once you have a session, the next
+   capture reuses it. No `storage-state` files, no `codegen`, no
+   fingerprint-fragile state to ship between machines.
+
+   **Preferred for local dev: drive the login form yourself, headless.** Most
+   dev apps expose a dev/credentials login (e.g. a seeded admin email behind
+   `ADMIN_DEV_AUTH=1`). Log in directly in the daemon — no human in the loop:
+
+   ```bash
+   B=~/.claude/skills/gstack/browse/dist/browse
+   $B goto  http://localhost:3000/login
+   $B click '#dev-email'           # focus the field first
+   $B type  'admin@example.com'    # real keystrokes — see gotcha below
+   $B click 'button[type=submit]'
+   $B url                          # confirm you landed past /login
+   ```
+
+   - **Controlled-input gotcha:** for React/Vue/Svelte controlled inputs,
+     `fill`/setting `.value` updates the DOM but does **not** fire the
+     framework's `onChange`, so the component's state stays empty and the form
+     submits blank. Use `click` + `type` (real keystrokes) instead, then
+     assert the field value before submitting.
+   - If the target page only renders with config present (e.g. a settings
+     page whose UI is gated on saved state), set that state through the UI
+     **and save it** before capturing — the capture script re-navigates fresh,
+     so unsaved client-side toggles are lost on reload.
+
+   **Fallback: interactive handoff** — for real OAuth/SSO you can't script,
+   open a window, log in by hand, then resume:
 
    ```bash
    ~/.claude/skills/gstack/browse/dist/browse handoff "log in to your dev app"
@@ -194,9 +238,7 @@ For routes that need screenshots from a live dev server:
    ~/.claude/skills/gstack/browse/dist/browse resume
    ```
 
-   Then rerun the capture command — subsequent navigations reuse the
-   session cookies. No `storage-state` files to manage, no `codegen`
-   recording, no fingerprint-fragile state to ship between machines.
+   Then rerun the capture command — subsequent navigations reuse the session.
 
 The rendered HTML inlines every local image as base64 so the file stays
 self-contained. http(s) `src` values pass through and resolve when the
