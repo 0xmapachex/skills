@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comparación lado a lado — grabación real vs. nuestro video</title>
+<style>
+  :root{--bg:#0e1216;--card:#171c22;--line:rgba(255,255,255,.10);--cream:#f4ecdd;--muted:#9aa0a6;--amber:#F0AB1A;--blue:#6fa8ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0d10;color:var(--cream);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:26px 30px 70px;max-width:1180px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 4px}
+  p.sub{color:var(--muted);margin:0 0 20px;max-width:920px}
+  .pair{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:18px}
+  .hd{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  .app{font-weight:700;font-size:11px;padding:2px 8px;border-radius:5px}
+  .app.h{background:#4a3a16;color:var(--amber)} .app.m{background:#14315a;color:var(--blue)} .app.k{background:#234;color:#bfe6ff}
+  .hd .t{font-weight:700;font-size:17px}
+  .hd .paso{margin-left:auto;font-size:12px;font-weight:700;color:var(--amber);background:rgba(240,171,26,.12);padding:3px 10px;border-radius:6px}
+  .imgs{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .imgs figure{margin:0}
+  .imgs img{width:100%;border-radius:10px;border:1px solid var(--line);display:block;background:#000}
+  .imgs figcaption{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:7px}
+  .note{color:var(--muted);font-size:13px;margin-top:10px}
+  .note b{color:var(--cream)}
+  .leg{color:var(--muted);font-size:13px;margin-bottom:16px}
+</style>
+</head>
+<body>
+<h1>↔️ Lado a lado — grabación REAL vs. nuestro video</h1>
+<p class="sub">Cada pantalla del onboarding original (izquierda) junto a nuestra recreación animada (derecha), en orden real. Para comparar fidelidad y revisar el mapeo de pasos.</p>
+<div class="leg">Izquierda = grabación real · Derecha = recreación (nuestra). <span class="app m">Meta</span> usa fuente Inter; los nombres de negocio están genéricos a propósito.</div>
+
+<div class="pair"><div class="hd"><span class="app h">holaema</span><span class="t">Mirá lo que cargamos (resumen)</span><span class="paso">intro</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/02.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-1.jpg"></figure></div></div>
+
+<div class="pair"><div class="hd"><span class="app h">holaema</span><span class="t">Conectá tu WhatsApp → Generar mi link</span><span class="paso">PASO 1 · estado 1</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/04.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-generar.jpg"></figure></div></div>
+
+<div class="pair" style="border-color:rgba(123,216,143,.4)"><div class="hd"><span class="app h">holaema</span><span class="t">Tu link está listo → Abrir link de conexión</span><span class="paso" style="color:#7bd88f;background:rgba(123,216,143,.12)">PASO 1 · estado 2 (nuevo)</span></div>
+  <div class="imgs"><figure><figcaption>Real (≈ seg 45)</figcaption><img src="map-frames/05.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-abrir.jpg"></figure></div>
+  <div class="note"><b>Nuevo estado.</b> El botón cambia a “Abrir link de conexión” (+ “Ya lo conecté, verificar ahora”) en sincronía con la voz (~34.5s), y eso abre Kapso ↓.</div></div>
+
+<div class="pair" style="border-color:rgba(123,216,143,.5)"><div class="hd"><span class="app k">Kapso</span><span class="t">Completar configuración → Conectar tu app</span><span class="paso" style="color:#7bd88f;background:rgba(123,216,143,.12)">PASO 2 · arranque (faltaba)</span></div>
+  <div class="imgs"><figure><figcaption>Real (≈ seg 55, justo después de “Abrir link”)</figcaption><img src="map-frames/kapso-entry.jpg"></figure><figure><figcaption>Nuestro (estado ready)</figcaption><img src="map-frames/ours-kapso-entry.jpg"></figure></div>
+  <div class="note"><b>Arranque de PASO 2.</b> Después de “Abrir link” se abre Kapso (app.kapso.ai) con el botón verde “Conectar tu app” — ese botón inicia la conexión con Facebook. De acá pasás a Meta (cuenta de Facebook + portafolio ↓). El componente ya existe (estado <code>ready</code>), solo falta colocarlo acá.</div></div>
+
+<div class="pair"><div class="hd"><span class="app m">Meta</span><span class="t">Selecciona los activos (Portafolio + Cuenta de WhatsApp Business)</span><span class="paso">PASO 2 (¿+3?)</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/06.jpg"></figure><figure><figcaption>Nuestro (desplegable WhatsApp abierto)</figcaption><img src="map-frames/ours-3.jpg"></figure></div>
+  <div class="note"><b>Acá pasan dos cosas:</b> elegir portafolio Y conectar la cuenta de WhatsApp Business. Candidato a dividir en PASO 2 + PASO 3.</div></div>
+
+<div class="pair"><div class="hd"><span class="app m">Meta</span><span class="t">Ingresa tu número de teléfono</span><span class="paso">PASO 4</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/11.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-4.jpg"></figure></div></div>
+
+<div class="pair"><div class="hd"><span class="app m">Meta</span><span class="t">Conecta tu app de WhatsApp Business existente</span><span class="paso" style="color:#ff6b6b;background:rgba(255,107,107,.12)">PASO 3 (orden ✗)</span></div>
+  <div class="imgs"><figure><figcaption>Real (va DESPUÉS del número)</figcaption><img src="map-frames/12.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-5.jpg"></figure></div>
+  <div class="note"><b>Orden:</b> en la realidad aparece después del número; en el video la mostramos antes (PASO 3).</div></div>
+
+<div class="pair"><div class="hd"><span class="app m">Meta</span><span class="t">Confirma o edita tu cuenta (zona horaria)</span><span class="paso">PASO 4</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/13.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-6.jpg"></figure></div></div>
+
+<div class="pair"><div class="hd"><span class="app m">Meta</span><span class="t">Tu cuenta está conectada a Kapso</span><span class="paso">PASO 5</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/15.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-7.jpg"></figure></div></div>
+
+<div class="pair"><div class="hd"><span class="app k">Kapso</span><span class="t">Completar configuración (Configurando WhatsApp)</span><span class="paso">PASO 5</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/17.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-8.jpg"></figure></div></div>
+
+<div class="pair"><div class="hd"><span class="app h">holaema</span><span class="t">¿Cómo querés arrancar con ema?</span><span class="paso">outro</span></div>
+  <div class="imgs"><figure><figcaption>Real</figcaption><img src="map-frames/18.jpg"></figure><figure><figcaption>Nuestro</figcaption><img src="map-frames/ours-9.jpg"></figure></div></div>
+
+</body>
+</html>

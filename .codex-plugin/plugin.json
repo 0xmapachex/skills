@@ -1,12 +1,12 @@
 {
   "name": "mapache-skills",
-  "version": "1.2.0",
-  "description": "Claude and Codex compatible skills for marketing ad creative, local tunneling, and PR database-change reviews.",
+  "version": "1.3.0",
+  "description": "Claude and Codex compatible skills: marketing ad creative, local tunneling, PR reviews (overview, DB, frontend, thermonuclear), Codex-driven code review, and Remotion product-tutorial videos.",
   "author": {
     "name": "0xmapachex"
   },
-  "homepage": "https://github.com/0xmapachex/ngrok-tunnel-skill",
-  "repository": "https://github.com/0xmapachex/ngrok-tunnel-skill",
+  "homepage": "https://github.com/0xmapachex/skills",
+  "repository": "https://github.com/0xmapachex/skills",
   "license": "MIT",
   "keywords": [
     "skills",
@@ -31,7 +31,10 @@
     "shortDescription": "Ad creative, ngrok tunnels, PR DB review",
     "longDescription": "Skill collection for producing on-brand social media image ads (Claude orchestrates, Codex gpt-5.5 generates), exposing local dev servers with ngrok, and creating PR database-change review overviews.",
     "category": "Engineering",
-    "capabilities": ["Read", "Write"],
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
     "brandColor": "#0EA5E9",
     "defaultPrompt": [
       "Use the relevant Mapache skill for this task."

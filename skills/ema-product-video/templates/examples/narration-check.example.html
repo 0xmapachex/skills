@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Narración vs. pantalla — ¿coincide lo que dice con lo que mostramos?</title>
+<style>
+  :root{--bg:#0e1216;--card:#171c22;--line:rgba(255,255,255,.10);--cream:#f4ecdd;--muted:#9aa0a6;--amber:#F0AB1A;--blue:#6fa8ff;--green:#7bd88f;--red:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0d10;color:var(--cream);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:26px 30px 70px;max-width:1080px;margin:0 auto}
+  h1{font-size:23px;margin:0 0 4px}
+  p.sub{color:var(--muted);margin:0 0 22px;max-width:920px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:18px}
+  .step.bad{border-color:rgba(255,107,107,.5)}
+  .hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .paso{font-weight:800;font-size:13px;background:var(--amber);color:#1a1714;padding:3px 11px;border-radius:6px}
+  .hd .t{font-weight:700;font-size:17px}
+  .verdict{margin-left:auto;font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px}
+  .verdict.ok{background:rgba(123,216,143,.15);color:var(--green)} .verdict.bad{background:rgba(255,107,107,.15);color:var(--red)}
+  .cols{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
+  figure{margin:0}
+  figure img,figure video{width:100%;border-radius:10px;border:1px solid var(--line);display:block;background:#000}
+  figcaption{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px}
+  .says{color:#d9cba8;font-size:14px;font-style:italic;line-height:1.5}
+  .says b{color:var(--cream);font-style:normal}
+  .fix{margin-top:10px;font-size:13.5px;color:var(--muted)}
+  .fix b{color:var(--amber)}
+  audio{display:none}
+</style>
+</head>
+<body>
+<h1>🎙️ ¿Coincide la narración con la pantalla?</h1>
+<p class="sub">Lo que dice el presentador (clip con audio, derecha) junto a la pantalla que mostramos (izquierda), por paso. La narración es la fuente de la verdad para mapear los pasos. <b>Dale play a cada clip.</b></p>
+
+<div class="step"><div class="hd"><span class="paso">INTRO</span><span class="t">Vas a necesitar</span><span class="verdict ok">✓ coincide</span></div>
+  <div class="cols">
+    <figure><figcaption>Nuestra animación</figcaption><img src="map-frames/ours-2.jpg" style="opacity:.5"><div style="font-size:12px;color:var(--muted);margin-top:6px">(gráficos “Vas a necesitar”)</div></figure>
+    <div><figure><figcaption>Lo que dice (clip)</figcaption><video src="narration-clips/0-intro-needs.mp4" controls preload="none"></video></figure>
+    <p class="says" style="margin-top:10px">“…ten a mano <b>el celular de tu negocio</b> para recibir el código de confirmación. Y también… tener acceso a la <b>página de Facebook</b> donde está registrado tu negocio.”</p>
+    <p class="fix"><b>Ojo:</b> dice “el celular de tu negocio” (no “WhatsApp Business”). Hoy la tarjeta 1 dice “WhatsApp Business”. ¿La dejamos así o la volvemos a “el celular de tu negocio”?</p></div>
+  </div></div>
+
+<div class="step"><div class="hd"><span class="paso">PASO 1</span><span class="t">Generá tu link → Abrir link de conexión</span><span class="verdict ok">✓ coincide + 2 estados</span></div>
+  <div class="cols">
+    <div style="display:flex;gap:8px">
+      <figure style="flex:1"><figcaption>Estado 1 · hasta 32.5s</figcaption><img src="map-frames/ours-generar.jpg"></figure>
+      <figure style="flex:1"><figcaption>Estado 2 · desde 32.5s</figcaption><img src="map-frames/ours-abrir.jpg"></figure>
+    </div>
+    <div><figure><figcaption>Lo que dice (clip)</figcaption><video src="narration-clips/1-paso1.mp4" controls preload="none"></video></figure>
+    <p class="says" style="margin-top:10px">“Paso uno… dale click al botón que dice <b>generar link de conexión</b>… cuando esté listo, dale click donde dice <b>abrir link de conexión</b>.”</p>
+    <p class="fix"><b>Nuevo:</b> ahora la pantalla cambia de estado en sincronía con la voz — “Generar mi link” hasta ~32.5s, y el botón <b>“Abrir link de conexión”</b> (+ “Ya lo conecté, verificar ahora”) aparece justo cuando lo dice (~34.5s). “Abrir link” → abre Kapso “Conectar tu app”, que ya es el arranque de PASO 2 ↓.</p></div>
+  </div></div>
+
+<div class="step"><div class="hd"><span class="paso">PASO 2</span><span class="t">Conectá tu cuenta de Facebook + portafolio</span><span class="verdict ok">✓ implementado</span></div>
+  <div class="cols">
+    <div style="display:flex;gap:8px">
+      <figure style="flex:1"><figcaption>Arranque · Kapso</figcaption><img src="map-frames/ours-kapso-entry.jpg"></figure>
+      <figure style="flex:1"><figcaption>Luego · Meta portafolio</figcaption><img src="map-frames/ours-portfolio-open.jpg"></figure>
+    </div>
+    <div><figure><figcaption>Lo que dice (clip)</figcaption><video src="narration-clips/2-paso2.mp4" controls preload="none"></video></figure>
+    <p class="says" style="margin-top:10px">“Paso dos… vas a tener que <b>conectar tu cuenta de Facebook</b>… el perfil donde tengas registrado tu negocio. Si no tenés esa página, ahí mismo podés crear un nuevo <b>portafolio comercial</b>… le das en continuar.”</p>
+    <p class="fix"><b>Corrección:</b> PASO 2 arranca con <b>Kapso “Conectar tu app”</b> (el botón que inicia la conexión con Facebook) → luego Meta: cuenta de Facebook + <b>portafolio</b>. El desplegable de WhatsApp Business NO va acá → es PASO 3.</p></div>
+  </div></div>
+
+<div class="step"><div class="hd"><span class="paso">PASO 3</span><span class="t">Conectá tu cuenta de WhatsApp Business (crear / conectar)</span><span class="verdict ok">✓ implementado</span></div>
+  <div class="cols">
+    <figure><figcaption>Lo que DEBERÍA mostrar (desplegable WhatsApp Business)</figcaption><img src="map-frames/ours-whatsapp-open.jpg"></figure>
+    <div><figure><figcaption>Lo que dice (clip)</figcaption><video src="narration-clips/3-paso3.mp4" controls preload="none"></video></figure>
+    <p class="says" style="margin-top:10px">“Paso tres, <b>conecta tu WhatsApp</b>… vas a ver <b>dos opciones</b>. Si nunca conectaste… dale a <b>crear una cuenta de WhatsApp Business</b>… Si ya usaste antes… <b>conectar una app</b> con WhatsApp Business.”</p>
+    <p class="fix"><b>Corrección grande:</b> PASO 3 = el <b>desplegable de Cuenta de WhatsApp Business</b> (mismo screen que PASO 2, otro desplegable) con las dos opciones “crear / conectar”. Hoy el video muestra acá la tarjeta “app existente” — esa va DESPUÉS, dentro de PASO 4.</p></div>
+  </div></div>
+
+<div class="step"><div class="hd"><span class="paso">PASO 4</span><span class="t">Ingresá tu número → app existente → confirma / zona horaria</span><span class="verdict ok">✓ coincide (3 pantallas)</span></div>
+  <div class="cols">
+    <div style="display:flex;gap:6px">
+      <figure style="flex:1"><figcaption>① Número</figcaption><img src="map-frames/ours-4.jpg"></figure>
+      <figure style="flex:1"><figcaption>② App existente</figcaption><img src="map-frames/ours-5.jpg"></figure>
+      <figure style="flex:1"><figcaption>③ Confirma / zona horaria</figcaption><img src="map-frames/ours-6.jpg"></figure>
+    </div>
+    <div><figure><figcaption>Lo que dice (clip)</figcaption><video src="narration-clips/4-paso4.mp4" controls preload="none"></video></figure>
+    <p class="says" style="margin-top:10px">“Paso cuatro, ingresa tu número… Elegí el código del país, +591… <b>En la siguiente pantalla</b>, elegí la <b>zona horaria</b> (La Paz GMT-4) y el nombre… te mostramos toda la información de tu negocio, revisala con cuidado.”</p>
+    <p class="fix"><b>PASO 4 son 3 pantallas seguidas:</b> número (~seg 0–14) → tarjeta “app existente” → <b>Confirma o edita tu cuenta / zona horaria</b> (~seg 19, la del screenshot). Ya están construidas; faltaba mostrarlas todas acá.</p></div>
+  </div></div>
+
+<div class="step"><div class="hd"><span class="paso">PASO 5</span><span class="t">Esperá la conexión</span><span class="verdict ok">✓ orden corregido (3 pantallas)</span></div>
+  <div class="cols">
+    <div style="display:flex;gap:6px">
+      <figure style="flex:1"><figcaption>① Revisá lo que compartís</figcaption><img src="map-frames/ours-revisa.jpg"></figure>
+      <figure style="flex:1"><figcaption>② Cuenta conectada</figcaption><img src="map-frames/ours-7.jpg"></figure>
+      <figure style="flex:1"><figcaption>③ Kapso “Conectando…” (esperá)</figcaption><img src="map-frames/ours-kapso-connecting.jpg"></figure>
+    </div>
+    <div><figure><figcaption>Lo que dice (clip)</figcaption><video src="narration-clips/5-paso5.mp4" controls preload="none"></video></figure>
+    <p class="says" style="margin-top:10px">“Paso cinco, espera la conexión… <b>uno o dos minutos mientras Facebook hace la conexión con WhatsApp Business</b>… <s>Tocá finalizar para volver a ema.</s>”</p>
+    <p class="fix"><b>Orden corregido:</b> ① <b>“Revisá lo que compartirás con Kapso”</b> → Confirmar → ② cuenta conectada (breve) → ③ <b>Kapso “Conectando…”</b>, donde se esperan 1–2 min. <b>No hay botón “Finalizar”</b> — el narrador se equivocó; el video termina en la pantalla de espera (sin confundir con un botón que no existe).</p></div>
+  </div></div>
+
+</body>
+</html>

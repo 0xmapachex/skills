@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de pasos — grabación real vs video actual</title>
+<style>
+  :root{--bg:#0e1216;--card:#171c22;--line:rgba(255,255,255,.10);--cream:#f4ecdd;--muted:#9aa0a6;--amber:#F0AB1A;--red:#ff6b6b;--green:#7bd88f;--blue:#6fa8ff}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0d10;color:var(--cream);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:26px 30px 70px;max-width:1180px;margin:0 auto}
+  h1{font-size:24px;margin:0 0 4px}
+  h2{font-size:18px;margin:32px 0 12px;border-bottom:1px solid var(--line);padding-bottom:8px}
+  p.sub{color:var(--muted);margin:0 0 6px;max-width:920px}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:8px 0 6px}
+  .app{font-weight:700;font-size:11px;padding:2px 8px;border-radius:5px}
+  .app.h{background:#4a3a16;color:var(--amber)} .app.m{background:#14315a;color:var(--blue)} .app.k{background:#234;color:#bfe6ff}
+  .row{display:flex;gap:18px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+  .row img{width:150px;border-radius:8px;border:1px solid var(--line);flex-shrink:0}
+  .row .body{flex:1}
+  .row .t{font-weight:700;font-size:16px;margin:2px 0 4px;display:flex;align-items:center;gap:10px}
+  .row .d{color:var(--muted);font-size:13.5px}
+  .paso{margin-top:9px;font-size:13px;font-weight:700}
+  .paso .ok{color:var(--green)} .paso .warn{color:var(--amber)} .paso .bad{color:var(--red)}
+  .note{background:#1b1408;border:1px solid rgba(240,171,26,.3);border-radius:10px;padding:13px 16px;margin:10px 0;font-size:14px}
+  .note b{color:var(--amber)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  th,td{border:1px solid var(--line);padding:9px 12px;text-align:left;vertical-align:top}
+  th{background:#11161b;color:var(--muted);font-weight:600}
+  td .bad{color:var(--red);font-weight:700} td .ok{color:var(--green);font-weight:700} td .warn{color:var(--amber);font-weight:700}
+</style>
+</head>
+<body>
+<h1>🗺️ Mapa de pasos — grabación real vs. video actual</h1>
+<p class="sub">Pantallas distintas de la grabación original (174s), en orden, y a qué PASO del video las mapeamos hoy. Sirve para detectar pasos omitidos o desordenados. <b>No cambia nada todavía</b> — es solo el mapa.</p>
+<div class="legend"><span class="app h">holaema</span> tu app · <span class="app m">Meta</span> facebook.com · <span class="app k">Kapso</span> app.kapso.ai</div>
+
+<h2>1 · El flujo REAL (en orden de la grabación)</h2>
+
+<div class="row"><img src="map-frames/02.jpg"><div class="body"><div class="t"><span class="app h">holaema</span> Mirá lo que cargamos</div><div class="d">Resumen de datos del negocio (Negocio / Horarios / Servicios / Equipo). “Siguiente — conectar WhatsApp”. <i>Aparece como “PASO 1 de 4” dentro de holaema.</i></div><div class="paso"><span class="warn">⚠ En el video: intro (no se ve en el teléfono, es antes de PHONE_IN)</span></div></div></div>
+
+<div class="row"><img src="map-frames/04.jpg"><div class="body"><div class="t"><span class="app h">holaema</span> Conectá tu WhatsApp → Generar mi link</div><div class="d">Tarjetas (sigue igual / Ema contesta / gratis) + botón “Generar mi link de conexión”.</div><div class="paso"><span class="ok">✓ En el video: PASO 1 “Generá tu link”</span></div></div></div>
+
+<div class="row"><img src="map-frames/05.jpg"><div class="body"><div class="t"><span class="app h">holaema</span> Abrir link de conexión</div><div class="d">“Abrir link de conexión” / “Ya lo conecté, verificar ahora”. Transición hacia Meta.</div><div class="paso"><span class="warn">⚠ En el video: no se muestra (se omite la transición)</span></div></div></div>
+
+<div class="row" style="border-color:rgba(240,171,26,.5)"><img src="map-frames/06.jpg"><div class="body"><div class="t"><span class="app m">Meta</span> Selecciona los activos comerciales</div><div class="d"><b>Una sola pantalla con DOS desplegables:</b> (a) <b>Portfolio comercial</b> (elegís el negocio) y (b) <b>Cuenta de WhatsApp Business</b> (“Crear una cuenta” / “Conecta una app de WhatsApp Business”). Acá pasan DOS cosas: elegir portafolio Y conectar la cuenta de WhatsApp Business.</div><div class="paso"><span class="warn">⚠ En el video: PASO 2 “Elegí tu portafolio” — hace las dos cosas en un paso</span></div></div></div>
+
+<div class="row"><img src="map-frames/11.jpg"><div class="body"><div class="t"><span class="app m">Meta</span> Ingresa tu número de teléfono</div><div class="d">Selector de país (Bolivia +591) + número + teclado. Validación.</div><div class="paso"><span class="warn">⚠ En el video: PASO 4 “Ingresá tu número”</span></div></div></div>
+
+<div class="row" style="border-color:rgba(255,107,107,.5)"><img src="map-frames/12.jpg"><div class="body"><div class="t"><span class="app m">Meta</span> Conecta tu app de WhatsApp Business existente</div><div class="d">Tarjeta informativa: “Compartir acceso” / “Protección de tus datos”. <b>En la grabación aparece DESPUÉS del número.</b></div><div class="paso"><span class="bad">✗ En el video: PASO 3 — pero está ANTES del número (orden invertido vs. la realidad)</span></div></div></div>
+
+<div class="row"><img src="map-frames/13.jpg"><div class="body"><div class="t"><span class="app m">Meta</span> Confirma o edita tu cuenta</div><div class="d">Nombre de la cuenta + Zona horaria (GMT-04 La Paz).</div><div class="paso"><span class="warn">⚠ En el video: dentro de PASO 4 (después del número)</span></div></div></div>
+
+<div class="row"><img src="map-frames/15.jpg"><div class="body"><div class="t"><span class="app m">Meta</span> Revisa → Conectando → Cuenta conectada</div><div class="d">Avatar degradé, “Revisa lo que compartirás”, “Conectando tu cuenta”, “Tu cuenta está conectada a Kapso”.</div><div class="paso"><span class="ok">✓ En el video: PASO 5 “Esperá la conexión”</span></div></div></div>
+
+<div class="row"><img src="map-frames/17.jpg"><div class="body"><div class="t"><span class="app k">Kapso</span> Completar configuración</div><div class="d">Pantalla oscura: “Conecta tu app de WhatsApp Business” / “Configurando WhatsApp…”.</div><div class="paso"><span class="ok">✓ En el video: final de PASO 5</span></div></div></div>
+
+<div class="row"><img src="map-frames/18.jpg"><div class="body"><div class="t"><span class="app h">holaema</span> ¿Cómo querés arrancar con ema?</div><div class="d">“ema responde a todos” / “Probar con unos contactos”. Cierre del onboarding.</div><div class="paso"><span class="warn">⚠ En el video: outro (la marca cierra, no se muestra en el teléfono)</span></div></div></div>
+
+<h2>2 · Cómo está mapeado HOY (PASO 1–5)</h2>
+<table>
+  <tr><th>PASO (video)</th><th>Título</th><th>Pantalla que muestra</th><th>Estado</th></tr>
+  <tr><td>1</td><td>Generá tu link</td><td>holaema “Conectá tu WhatsApp” + Generar</td><td><span class="ok">OK</span></td></tr>
+  <tr><td>2</td><td>Elegí tu portafolio</td><td>Meta “Selecciona los activos” (portafolio <b>+ cuenta de WhatsApp Business</b>)</td><td><span class="warn">Junta 2 acciones</span></td></tr>
+  <tr><td>3</td><td>Conectá tu WhatsApp</td><td>Meta “Conecta tu app existente” (tarjeta)</td><td><span class="bad">Fuera de orden (va después del número)</span></td></tr>
+  <tr><td>4</td><td>Ingresá tu número</td><td>Meta país + número + Confirma/zona horaria</td><td><span class="warn">OK, pero la tarjeta del PASO 3 debería caer acá en el medio</span></td></tr>
+  <tr><td>5</td><td>Esperá la conexión</td><td>Meta revisa/conectando/conectada + Kapso</td><td><span class="ok">OK</span></td></tr>
+</table>
+
+<h2>3 · Los dos problemas a decidir</h2>
+<div class="note"><b>A · La cuenta de WhatsApp Business no tiene su propio paso.</b> En la realidad se elige en la MISMA pantalla que el portafolio (un solo screen, dos desplegables). Hoy es PASO 2 “Elegí tu portafolio”, que en verdad hace las dos cosas. <br>→ Opción: dividir en <b>PASO 2 “Elegí tu portafolio”</b> y <b>PASO 3 “Conectá tu cuenta de WhatsApp Business”</b> (mismo screen, enfocando cada desplegable por turno con el zoom).</div>
+<div class="note"><b>B · La tarjeta “Conecta tu app existente” está fuera de orden.</b> Hoy es PASO 3 y va ANTES del número. En la grabación va DESPUÉS del número (número → tarjeta → confirma/zona horaria). <br>→ Opción: moverla a su lugar real, entre el número y la confirmación.</div>
+
+<h2>4 · Propuesta de re-mapeo (a confirmar — sin tocar nada todavía)</h2>
+<table>
+  <tr><th>PASO</th><th>Título sugerido</th><th>Pantalla</th></tr>
+  <tr><td>1</td><td>Generá tu link</td><td>holaema “Conectá tu WhatsApp” → Generar → <b>Abrir link de conexión</b></td></tr>
+  <tr><td>2</td><td>Conectá tu cuenta de Facebook + portafolio</td><td><b>Kapso “Conectar tu app”</b> (inicia la conexión) → Meta “Selecciona los activos” — Facebook + zoom al desplegable <b>Portafolio comercial</b> → continuar</td></tr>
+  <tr><td>3</td><td>Conectá tu cuenta de WhatsApp Business</td><td>Meta “Selecciona los activos” — zoom al desplegable <b>Cuenta de WhatsApp Business</b> (crear / conectar)</td></tr>
+  <tr><td>4</td><td>Ingresá tu número</td><td>Meta país + número → tarjeta “app existente” → Confirma/zona horaria</td></tr>
+  <tr><td>5</td><td>Esperá la conexión</td><td>Meta revisa/conectando/conectada + Kapso configura</td></tr>
+</table>
+<p class="sub" style="margin-top:12px">Decime si esta estructura te cierra (o cómo querés re-ordenar) y recién ahí lo implemento.</p>
+</body>
+</html>

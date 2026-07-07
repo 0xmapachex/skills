@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Narración vs. pantalla — mapa maestro</title>
+<!--
+  MASTER step-mapping board. One <div class="step"> per step:
+    LEFT  = the screen(s) we show (still images; stack several in a flex row for multi-screen steps)
+    RIGHT = the presenter clip (audio) + the verbatim narration + a verdict
+  Build this FIRST and get human sign-off before writing any timeline code.
+  Cut the clips with scripts/cut-clips.sh; pull the narration text with scripts/extract-narration.py.
+-->
+<style>
+  :root{--card:#171c22;--line:rgba(255,255,255,.10);--cream:#f4ecdd;--muted:#9aa0a6;--amber:#F0AB1A;--green:#7bd88f;--red:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0d10;color:var(--cream);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:26px 30px 70px;max-width:1080px;margin:0 auto}
+  h1{font-size:23px;margin:0 0 18px}
+  .step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:18px}
+  .step.bad{border-color:rgba(255,107,107,.5)}
+  .hd{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .paso{font-weight:800;font-size:13px;background:var(--amber);color:#1a1714;padding:3px 11px;border-radius:6px}
+  .hd .t{font-weight:700;font-size:17px}
+  .verdict{margin-left:auto;font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px}
+  .verdict.ok{background:rgba(123,216,143,.15);color:var(--green)} .verdict.bad{background:rgba(255,107,107,.15);color:var(--red)}
+  .cols{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start}
+  figure{margin:0;flex:1} figcaption{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-bottom:7px}
+  figure img,figure video{width:100%;border-radius:10px;border:1px solid var(--line);display:block;background:#000}
+  .says{color:#d9cba8;font-size:14px;font-style:italic;margin-top:10px} .says b{color:var(--cream);font-style:normal}
+  .fix{margin-top:10px;font-size:13.5px;color:var(--muted)} .fix b{color:var(--amber)}
+</style>
+</head>
+<body>
+<h1>🎙️ ¿Coincide la narración con la pantalla?</h1>
+
+<!-- duplicate one block per step -->
+<div class="step"><div class="hd"><span class="paso">PASO N</span><span class="t">Título del paso</span><span class="verdict ok">✓ coincide</span></div>
+  <div class="cols">
+    <div style="display:flex;gap:6px">
+      <figure><figcaption>① Pantalla</figcaption><img src="screens/ours-N.jpg"></figure>
+      <!-- add more <figure> for multi-screen steps -->
+    </div>
+    <div><figure><figcaption>Lo que dice (clip)</figcaption><video src="clips/N-paso.mp4" controls preload="none"></video></figure>
+      <p class="says">“…texto exacto de la narración…”</p>
+      <p class="fix"><b>Nota:</b> correcciones / orden / qué pantalla debería mostrar.</p>
+    </div>
+  </div></div>
+
+</body>
+</html>

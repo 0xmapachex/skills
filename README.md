@@ -7,6 +7,8 @@ Claude and Codex compatible skills published by `0xmapachex`.
 - `ad-creative-studio` - produce polished, on-brand social media image ads for any company. Claude orchestrates; Codex `gpt-5.5` generates a text-free photo via its built-in `image_gen` tool; the brand layer (headline, logo, offer, CTA) is composited deterministically in HTML.
 - `ngrok-tunnel` - expose a local port to the internet on a stable free ngrok static domain.
 - `pr-db-review-overview` - create complete PR overviews with special handling for database, migration, schema, ORM, seed, and data-model changes.
+- `frontend-pr-review` - five-pass frontend review before merge: duplicate code, shadcn/ui compliance, component responsibility, loading/empty/error states, and performance.
+- `thermonuclear-pr-review` - deep, adversarial, multi-angle production-readiness review of a single PR or branch: fan out one skeptical reviewer per risk dimension, independently verify each finding, then synthesize a ship / ship-with-fixes / block verdict.
 
 ## Install In Claude Code
 
@@ -69,9 +71,11 @@ cp -R /tmp/mapache-skills/skills/pr-db-review-overview ~/.claude/skills/
 │   │   ├── SKILL.md
 │   │   ├── agents/openai.yaml
 │   │   └── setup.sh
-│   └── pr-db-review-overview/
-│       ├── SKILL.md
-│       └── agents/openai.yaml
+│   ├── pr-db-review-overview/
+│   │   ├── SKILL.md
+│   │   └── agents/openai.yaml
+│   └── frontend-pr-review/
+│       └── SKILL.md
 ├── README.md
 └── LICENSE
 ```

@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phone chrome — high-fidelity variants</title>
+<style>
+  :root{--bg:#0e1216;--card:#171c22;--line:rgba(255,255,255,.10);--cream:#f4ecdd;--muted:#9aa0a6;--amber:#F0AB1A}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0d10;color:var(--cream);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:26px 30px 60px}
+  h1{font-size:22px;margin:0 0 4px}
+  p.sub{color:var(--muted);margin:0 0 24px;max-width:900px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;max-width:1180px}
+  .col{display:flex;flex-direction:column;align-items:center}
+  .cap{margin-top:14px;color:var(--muted);font-size:13px;text-align:center}.cap b{color:var(--cream)}
+
+  /* ---- device ---- */
+  .phone{position:relative;width:330px;aspect-ratio:1170/2532;background:#0a0b0d;border-radius:13%/6%;padding:10px;
+    box-shadow:0 30px 70px rgba(0,0,0,.55), inset 0 0 0 2px rgba(255,255,255,.07);}
+  .phone .pw{position:absolute;right:-3px;top:25%;width:3px;height:10%;background:#1b1d20;border-radius:3px}
+  .phone .v1{position:absolute;left:-3px;top:21%;width:3px;height:6%;background:#1b1d20;border-radius:3px}
+  .phone .v2{position:absolute;left:-3px;top:30%;width:3px;height:6%;background:#1b1d20;border-radius:3px}
+  .scr{position:relative;width:100%;height:100%;border-radius:9%/4.4%;overflow:hidden;background:#fff;display:flex;flex-direction:column}
+
+  /* status bar with dynamic island (island sits IN the status bar, never over the address bar) */
+  .status{position:relative;height:42px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 22px;color:#1c1e21;font-size:14px;font-weight:600}
+  .status.dark{color:#fff}
+  .island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:34%;height:26px;background:#000;border-radius:99px}
+  .status .ind{display:flex;align-items:center;gap:5px}
+  .bars{display:flex;align-items:flex-end;gap:2px;height:11px}
+  .bars i{width:3px;background:currentColor;border-radius:1px}
+  .batt{width:24px;height:12px;border:1.4px solid currentColor;border-radius:3px;padding:1.5px}
+  .batt span{display:block;height:100%;width:72%;background:currentColor;border-radius:1px}
+
+  /* address bar pill */
+  .addr{flex-shrink:0;height:40px;margin:6px 12px;border-radius:12px;background:#ececed;display:flex;align-items:center;justify-content:center;gap:7px;color:#3c3c43;font-size:14px;position:relative}
+  .addr .aa{position:absolute;left:12px;font-size:13px;color:#7c7c80;font-weight:700}
+  .addr .rl{position:absolute;right:12px;font-size:13px;color:#7c7c80}
+  .addr .lock{font-size:11px;opacity:.7}
+
+  /* page */
+  .page{flex:1;background:#F5F5F0;padding:14px 16px;overflow:hidden;color:#1A1714}
+  .page .h{display:flex;justify-content:space-between;align-items:center;font-size:9px;color:#6B6358;margin-bottom:10px}
+  .page .t{font-size:20px;font-weight:700;margin:4px 0 8px}
+  .page .row{background:#fff;border:1px solid rgba(26,23,20,.1);border-radius:10px;padding:9px 10px;font-size:9px;color:#6B6358;margin-bottom:7px}
+  .page .btn{background:var(--amber);border-radius:9px;height:34px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#1A1714;margin-top:8px}
+
+  /* bottom toolbar (realistic SF-style) */
+  .tabbar{flex-shrink:0;height:46px;background:#f7f7f8;border-top:1px solid #d8d8da;display:flex;align-items:center;justify-content:space-around;color:#0a84ff}
+  .tabbar svg{width:22px;height:22px}
+  .tabbar .tabs{width:20px;height:20px;border:2px solid #0a84ff;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+  .home{flex-shrink:0;height:18px;display:flex;align-items:center;justify-content:center;background:#fff}
+  .home span{width:36%;height:4px;background:#1c1c1e;border-radius:99px}
+  .home.dk{background:#F5F5F0}
+</style>
+</head>
+<body>
+<h1>Phone chrome — pick the realistic Safari look</h1>
+<p class="sub">Fixes: the dynamic island now sits <b>in the status bar</b> (never over the URL), and a real Safari toolbar. Three options — tell me which (A / B / C), and whether the URL bar should be top or bottom.</p>
+
+<div class="grid">
+
+  <!-- A: top address bar + bottom toolbar (classic) -->
+  <div class="col"><div class="phone"><span class="pw"></span><span class="v1"></span><span class="v2"></span>
+    <div class="scr">
+      <div class="status"><div class="island"></div><span>9:41</span><span class="ind"><span class="bars"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:11px"></i></span><span>📶</span><span class="batt"><span></span></span></span></div>
+      <div class="addr"><span class="aa">aA</span><span class="lock">🔒</span> dashboard.holaema.app <span class="rl">⟳</span></div>
+      <div class="page"><div class="h">⟵ BIENVENIDA<span>PASO 2 · CONECTAR</span></div><div class="t">Conectá tu WhatsApp</div><div class="row">✓ Tu WhatsApp sigue igual…</div><div class="row">✓ Ema contesta junto a vos…</div><div class="row">Antes de abrir el link…</div><div class="btn">Generar mi link de conexión</div></div>
+      <div class="tabbar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#b0b0b4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M5 14v5a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg>
+        <span class="tabs">2</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h11a1 1 0 011 1v15l-6.5-4L5 20V5a1 1 0 011-1z"/></svg>
+      </div>
+      <div class="home"><span></span></div>
+    </div></div>
+    <div class="cap"><b>A · Classic</b><br>URL bar on top + full bottom toolbar.</div>
+  </div>
+
+  <!-- B: bottom address bar (modern iOS default) -->
+  <div class="col"><div class="phone"><span class="pw"></span><span class="v1"></span><span class="v2"></span>
+    <div class="scr">
+      <div class="status"><div class="island"></div><span>9:41</span><span class="ind"><span class="bars"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:11px"></i></span><span>📶</span><span class="batt"><span></span></span></span></div>
+      <div class="page" style="flex:1"><div class="h">⟵ BIENVENIDA<span>PASO 2 · CONECTAR</span></div><div class="t">Conectá tu WhatsApp</div><div class="row">✓ Tu WhatsApp sigue igual…</div><div class="row">✓ Ema contesta junto a vos…</div><div class="row">✓ Gratis durante la prueba…</div><div class="row">Antes de abrir el link…</div><div class="btn">Generar mi link de conexión</div></div>
+      <div class="addr" style="margin:7px 12px 4px"><span class="aa">aA</span><span class="lock">🔒</span> dashboard.holaema.app <span class="rl">⟳</span></div>
+      <div class="tabbar" style="height:40px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#b0b0b4" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M8 8l4-4 4 4M5 14v5a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg>
+        <span class="tabs">2</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h11a1 1 0 011 1v15l-6.5-4L5 20V5a1 1 0 011-1z"/></svg>
+      </div>
+      <div class="home"><span></span></div>
+    </div></div>
+    <div class="cap"><b>B · Modern</b><br>URL bar at the bottom (iOS 17 default) + toolbar.</div>
+  </div>
+
+  <!-- C: minimal -->
+  <div class="col"><div class="phone"><span class="pw"></span><span class="v1"></span><span class="v2"></span>
+    <div class="scr">
+      <div class="status"><div class="island"></div><span>9:41</span><span class="ind"><span class="bars"><i style="height:4px"></i><i style="height:6px"></i><i style="height:8px"></i><i style="height:11px"></i></span><span>📶</span><span class="batt"><span></span></span></span></div>
+      <div class="addr" style="background:#f0f0f1;margin:6px 14px;height:36px"><span class="lock">🔒</span> dashboard.holaema.app</div>
+      <div class="page" style="flex:1"><div class="h">⟵ BIENVENIDA<span>PASO 2 · CONECTAR</span></div><div class="t">Conectá tu WhatsApp</div><div class="row">✓ Tu WhatsApp sigue igual…</div><div class="row">✓ Ema contesta junto a vos…</div><div class="row">✓ Gratis durante la prueba…</div><div class="row">Antes de abrir el link…</div><div class="btn">Generar mi link de conexión</div></div>
+      <div class="home dk"><span></span></div>
+    </div></div>
+    <div class="cap"><b>C · Minimal</b><br>Just a compact URL bar on top, no bottom toolbar. Cleanest.</div>
+  </div>
+
+</div>
+</body>
+</html>
